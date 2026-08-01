@@ -5,7 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "adafruit-circuitpython-pca9685>=3.4.22",
+    "numpy>=2.4.4",
     "opencv-python>=4.13.0.92",
+    "rpi-gpio>=0.7.1",
 ]
 
 [dependency-groups]
