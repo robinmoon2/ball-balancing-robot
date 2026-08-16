@@ -2,7 +2,13 @@ import numpy as np
 
 
 class KalmanFilter:
-    def __init__(self,initial_x: float, initial_y: float, accel_variance: float, F: np.ndarray=np.array([[1, 0], [0, 1]]), G: np.ndarray = np.array([[0.5, 0], [0, 0.5]]), R: np.ndarray = np.array([[1, 0], [0, 1]]), H: np.ndarray = np.array([[1, 0, 0, 0], [0, 1, 0, 0]]), g: float = 9.81):
+    def __init__(self,initial_x: float, initial_y: float, accel_variance: float, 
+                 F: np.ndarray=np.array([[1, 0], [0, 1]]), 
+                 G: np.ndarray = np.array([[0.5, 0], [0, 0.5]]), 
+                 R: np.ndarray = np.array([[1, 0], [0, 1]]), 
+                 H: np.ndarray = np.array([[1, 0, 0, 0], [0, 1, 0, 0]]), 
+                 g: float = 9.81):
+        
         # State transition matrix
         self.G = G  # Control input matrix
         self.H = H
@@ -19,7 +25,7 @@ class KalmanFilter:
         ])
         self._accel_variance = accel_variance
         self._current_state = np.array([[initial_x], [initial_y], [0], [0]])  # Initial state
-        self.P = np.eye(4)  # Initial estimate covariance
+        self.P = np.diag([4.0, 4.0, 90000.0, 90000.0]) # Initial estimate covariance
         self.g = g # Gravity acceleration in m/s²
     
         
@@ -41,13 +47,13 @@ class KalmanFilter:
         # Control input: gravity in y-direction
         a = np.array([[0], [self.g]])
         new_state = self.F.dot(self._current_state) + self.G.dot(a)  # State prediction
-
-        new_P = self.F.dot(self.P).dot(self.F.T) + self.G.dot(self.G.T) * self._accel_variance  # Covariance prediction
+        Q = (self.G.dot(self.G.T) * self._accel_variance)  # Process noise covariance
+        new_P = self.F.dot(self.P).dot(self.F.T) + Q  # Covariance prediction
         
         self._current_state = new_state
         self.P = new_P
     
-    def update(self, x_meas: np.ndarray, y_meas: np.ndarray, meas_variance: float):
+    def update(self, x_meas: np.ndarray, y_meas: np.ndarray):
         # y = z - Hx
         # S = H P Ht + R
         # K = P Ht S^-1
@@ -62,7 +68,12 @@ class KalmanFilter:
         K = self.P.dot(self.H.T).dot(np.linalg.inv(S))  # Kalman gain
 
         new_state = self._current_state + K.dot(y)  # Updated state estimate
-        new_P = (np.eye(4) - K.dot(self.H)).dot(self.P)  # Updated estimate covariance
+        I_KH = np.eye(4) - K.dot(self.H)  # Identity minus Kalman gain times H
+        new_P = I_KH.dot(self.P).dot(I_KH.T) + K.dot(self.R).dot(K.T)  # Updated estimate covariance
         
         self.P = new_P
         self._current_state = new_state
+
+    
+    def get_current_state(self) -> np.ndarray:
+        return self._current_state
