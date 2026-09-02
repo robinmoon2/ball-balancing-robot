@@ -66,3 +66,4 @@ class OrangeDetector:
         mean_score = float(score_map[blob_mask == 255].mean())
 
         return Detection(found=True, x=cx, y=cy, area=area, score=mean_score)
+    

@@ -2,8 +2,8 @@
 from __future__ import annotations
 import cv2
 
-from src.perception.camera import Camera
-from src.perception.detector import OrangeDetector
+from camera import Camera
+from detector import OrangeDetector
 
 
 def draw_overlay(frame, detection) -> None:
