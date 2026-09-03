@@ -1,4 +1,5 @@
 """Entry point: connects PlateSim <-> PlateController."""
+
 from __future__ import annotations
 import math
 import time
@@ -24,14 +25,22 @@ def main(realtime: bool = True, duration: float = 30.0) -> None:
     sim.reset(x=60.0, y=-40.0)
 
     # Starting gains — you will TUNE these. These are a reasonable starting point.
-    pid_x = PID(kp=0.0015, ki=0.0, kd=0.0010,
-                output_limits=(-math.radians(15), math.radians(15)),
-                integral_limits=(-0.5, 0.5),
-                derivative_filter=0.85)
-    pid_y = PID(kp=0.0015, ki=0.0, kd=0.0010,
-                output_limits=(-math.radians(15), math.radians(15)),
-                integral_limits=(-0.5, 0.5),
-                derivative_filter=0.85)
+    pid_x = PID(
+        kp=0.0015,
+        ki=0.0,
+        kd=0.0010,
+        output_limits=(-math.radians(15), math.radians(15)),
+        integral_limits=(-0.5, 0.5),
+        derivative_filter=0.85,
+    )
+    pid_y = PID(
+        kp=0.0015,
+        ki=0.0,
+        kd=0.0010,
+        output_limits=(-math.radians(15), math.radians(15)),
+        integral_limits=(-0.5, 0.5),
+        derivative_filter=0.85,
+    )
 
     controller = PlateController(pid_x, pid_y, max_tilt_rad=math.radians(15))
     controller.set_target(0.0, 0.0)
@@ -77,7 +86,9 @@ def main(realtime: bool = True, duration: float = 30.0) -> None:
 
     print(f"Done. on_plate={sim.s.on_plate}, final=({sim.s.x:.1f},{sim.s.y:.1f})")
     import matplotlib.pyplot as plt
-    plt.ioff(); plt.show()
+
+    plt.ioff()
+    plt.show()
 
 
 if __name__ == "__main__":

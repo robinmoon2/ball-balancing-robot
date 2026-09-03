@@ -1,4 +1,5 @@
 """Plate controller: ball state -> (roll, pitch) commands."""
+
 from __future__ import annotations
 from dataclasses import dataclass
 import math
@@ -8,16 +9,16 @@ from .pid import PID
 
 @dataclass
 class BallState:
-    x: float        # mm, plate frame
-    y: float        # mm
-    vx: float = 0.0 # mm/s
+    x: float  # mm, plate frame
+    y: float  # mm
+    vx: float = 0.0  # mm/s
     vy: float = 0.0
     found: bool = True
 
 
 @dataclass
 class PlateCommand:
-    roll: float   # rad, rotation about plate X axis
+    roll: float  # rad, rotation about plate X axis
     pitch: float  # rad, rotation about plate Y axis
 
 

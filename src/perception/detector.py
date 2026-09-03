@@ -1,4 +1,5 @@
 """Orange-mass detector using a per-pixel 'orangeness' score in RGB."""
+
 from __future__ import annotations
 from dataclasses import dataclass
 import cv2
@@ -44,8 +45,7 @@ class OrangeDetector:
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                       cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             return Detection(found=False)
 
@@ -66,4 +66,3 @@ class OrangeDetector:
         mean_score = float(score_map[blob_mask == 255].mean())
 
         return Detection(found=True, x=cx, y=cy, area=area, score=mean_score)
-    
