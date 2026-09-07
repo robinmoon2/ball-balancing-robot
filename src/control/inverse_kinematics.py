@@ -28,7 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
 
-from src.control.arm import Arm
+from control.arm import Arm
 
 
 ###VARIABLES
@@ -93,15 +93,33 @@ def solve_bearing_positions(target_orientation: PlateOrientation, arms: np.ndarr
     """Compute the position of each arm's bearing joint based on the end effector position and the plate orientation."""
     bearing_positions = np.empty(arms.shape[0], dtype=object)
     for i, (arm, end_effector) in enumerate(zip(arms, arms_end_effector)):
-        A = ( arm.L3 - end_effector.x )/ end_effector.z
-        B = ( end_effector.x**2 + end_effector.y**2 + end_effector.z**2 + arm.L2**2 - arm.L1**2 - arm.L3**2 ) / ( 2 * end_effector.z )
+        # Rotate the end effector into this arm's local (a, b, c) frame -
+        # (a = radial, b = tangential, c = height) - before solving. The
+        # A/B/D/E/F formula below assumes a planar 2-link problem in that
+        # local frame; b should come out ~0 (P_i sits exactly on its own
+        # azimuth ray), but only after this rotation.
+        theta_i = arm.get_azimuth()
+        cos_t, sin_t = np.cos(theta_i), np.sin(theta_i)
+        a = end_effector.x * cos_t + end_effector.y * sin_t
+        b = -end_effector.x * sin_t + end_effector.y * cos_t
+        c = end_effector.z
+
+        A = ( arm.L3 - a )/ c
+        B = ( a**2 + b**2 + c**2 + arm.L2**2 - arm.L1**2 - arm.L3**2 ) / ( 2 * c )
         ## Then we use those for x :
         D = A**2 + 1
         E = 2*(A*B - arm.L3)
         F = arm.L3**2 + B**2 - arm.L2**2
-        x_bearing = (-E - np.sqrt(E**2 - 4*D*F)) / (2*D)
+        # Two roots exist (elbow "reaching outward" vs "folded back past the
+        # motor"). D > 0 always, so +sqrt is the larger x = the outward one.
+        # That's the correct branch for this build, where the plate joint sits
+        # outside the motor axis (L > L3): the arm reaches out, and the angle
+        # then moves monotonically the right way (higher plate -> horn up).
+        # The -sqrt root folds the arm backward and lands near 180 deg, way
+        # outside the servos' commandable range.
+        x_bearing = (-E + np.sqrt(E**2 - 4*D*F)) / (2*D)
         z_bearing = A*x_bearing + B
-        y_bearing = end_effector.y * (z_bearing / end_effector.z)
+        y_bearing = b * (z_bearing / c)
         bearing_position = VectorPosition(x=x_bearing, y=y_bearing, z=z_bearing)
         arm.bearing_position = bearing_position
         bearing_positions[i] = bearing_position

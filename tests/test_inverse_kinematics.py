@@ -105,19 +105,35 @@ def test_normal_vector_board_unit_norm():
 
 # ---------- solve_bearing_positions ----------
 
-def test_solve_bearing_positions_returns_one_per_arm():
-    """Minimal smoke test: 3 arms in, 3 bearing positions out, no crash.
+def test_solve_bearing_positions_satisfies_constraints_all_arms():
+    """All 3 arms (not just the one at azimuth 0) must produce a finite
+    bearing position satisfying both link-length constraints, checked in
+    that arm's own local (a, b, c) frame.
 
-    Currently fails: `bearing_positions[arm] = bearing_position` indexes the
-    result array by an Arm object instead of by position (e.g. via
-    enumerate), which raises IndexError on the very first arm.
+    Regression test for the missing local-frame rotation: solve_bearing_positions
+    used to feed each end effector's raw global (x, y, z) straight into its
+    2-link solve, which only happens to be correct for the arm at azimuth 0
+    (global frame == local frame there) and produced NaN for the other two.
     """
     orientation = PlateOrientation(n=(0.05, -0.05, 0.99), h=4.0)
-    arms = make_arms()
+    arms = make_arms(L1=4.0, L2=4.0, L3=1.0)
     end_effectors = solve_end_effector_positions(orientation, arms, L=2.0)
 
     bearing_positions = solve_bearing_positions(orientation, arms, end_effectors, L=2.0)
     assert len(bearing_positions) == len(arms)
+
+    for arm, end_effector, bearing in zip(arms, end_effectors, bearing_positions):
+        assert np.isfinite([bearing.x, bearing.y, bearing.z]).all()
+
+        theta_i = arm.get_azimuth()
+        a = end_effector.x * np.cos(theta_i) + end_effector.y * np.sin(theta_i)
+        b = -end_effector.x * np.sin(theta_i) + end_effector.y * np.cos(theta_i)
+        c = end_effector.z
+
+        base_dist_sq = (bearing.x - arm.L3) ** 2 + bearing.z ** 2
+        target_dist_sq = (bearing.x - a) ** 2 + (bearing.y - b) ** 2 + (bearing.z - c) ** 2
+        assert abs(base_dist_sq - arm.L2**2) < 1e-6
+        assert abs(target_dist_sq - arm.L1**2) < 1e-6
 
 
 def test_bearing_position_round_trip():
