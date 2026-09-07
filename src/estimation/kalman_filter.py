@@ -2,20 +2,23 @@ import numpy as np
 
 
 class KalmanFilter:
+    """Constant-velocity Kalman filter for a ball's (x, y) position.
+
+    No gravity/acceleration term: the ball moves on a plate, not in free
+    fall, so acceleration comes from plate tilt rather than a constant
+    world-frame force. That acceleration isn't modeled explicitly here —
+    it's absorbed into the process noise via accel_variance, per the
+    constant-velocity assumption in estimation.md.
+    """
+
     def __init__(
         self,
         initial_x: float,
         initial_y: float,
         accel_variance: float,
-        F: np.ndarray = np.array([[1, 0], [0, 1]]),
-        G: np.ndarray = np.array([[0.5, 0], [0, 0.5]]),
-        R: np.ndarray = np.array([[1, 0], [0, 1]]),
+        R: np.ndarray = np.eye(2),
         H: np.ndarray = np.array([[1, 0, 0, 0], [0, 1, 0, 0]]),
-        g: float = 9.81,
     ):
-
-        # State transition matrix
-        self.G = G  # Control input matrix
         self.H = H
         self.R = R  # Measurement noise covariance
         # Base G for velocity terms (1 factor)
@@ -27,18 +30,17 @@ class KalmanFilter:
             [[initial_x], [initial_y], [0], [0]]
         )  # Initial state
         self.P = np.diag([4.0, 4.0, 90000.0, 90000.0])  # Initial estimate covariance
-        self.g = g  # Gravity acceleration in m/s²
 
     def predict(self, dt: float):
-        # Predict the next state based on the current state and control input
-        # x = F *x
-        # P = F P Ft + G a Gt
+        # Predict the next state based on the current state (constant velocity)
+        # x = F x
+        # P = F P Ft + Q
         self.F = np.array(
             [
                 [1, 0, dt, 0],  # x = x + vx*dt
                 [0, 1, 0, dt],  # y = y + vy*dt
                 [0, 0, 1, 0],  # vx = vx
-                [0, 0, 0, 1],  # vy = vy + g*dt (but g is in Q)
+                [0, 0, 0, 1],  # vy = vy
             ]
         )
 
@@ -46,9 +48,7 @@ class KalmanFilter:
         self.G[:2, :] = self.G_pos * (dt**2)  # Position terms (dt²)
         self.G[2:, :] = self.G_vel * dt  # Velocity terms (dt)
 
-        # Control input: gravity in y-direction
-        a = np.array([[0], [self.g]])
-        new_state = self.F.dot(self._current_state) + self.G.dot(a)  # State prediction
+        new_state = self.F.dot(self._current_state)  # State prediction
         Q = self.G.dot(self.G.T) * self._accel_variance  # Process noise covariance
         new_P = self.F.dot(self.P).dot(self.F.T) + Q  # Covariance prediction
 

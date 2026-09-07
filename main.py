@@ -11,7 +11,6 @@ from src.perception.detector import OrangeDetector
 from src.estimation.kalman_filter import KalmanFilter
 
 # global variables for Kalman Filter
-g = 0.0
 MEASUREMENT_NOISE_VARIANCE = 4.0
 R = np.eye(2) * MEASUREMENT_NOISE_VARIANCE
 
@@ -26,9 +25,8 @@ def draw_overlay(frame, detection, dt) -> None:
                 initial_x=detection.x,
                 initial_y=detection.y,
                 accel_variance=250000.0,
-                g=9.81,
                 R=R,
-            )  # Initialize Kalman Filter with gravit
+            )  # Initialize Kalman Filter (constant-velocity)
             return  # Skip drawing for the first frame to initialize the filter
         KF.predict(dt=dt)  # Predict the next state
         predicted_state = KF.get_current_state()
