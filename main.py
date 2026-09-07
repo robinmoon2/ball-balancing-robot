@@ -100,7 +100,7 @@ def main(source: int | str = 0, output_path: str = "output.avi") -> None:
             if frame is None:
                 print("Frame grab failed.")
                 break
-
+            print("frame size:", frame.shape)
             detection = detector.detect(frame)
             draw_overlay(frame, detection, dt)
 
@@ -114,4 +114,5 @@ def main(source: int | str = 0, output_path: str = "output.avi") -> None:
 
 
 if __name__ == "__main__":
+    print("Start of the script ")
     main(0)
