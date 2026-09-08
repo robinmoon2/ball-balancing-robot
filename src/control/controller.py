@@ -6,7 +6,6 @@ import math
 
 from .pid import PID
 
-
 @dataclass
 class BallState:
     x: float  # mm, plate frame

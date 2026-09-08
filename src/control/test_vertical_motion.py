@@ -28,10 +28,6 @@ from control.inverse_kinematics import (
     solve_servo_angles,
 )
 
-### CONFIG - measured off the rig, all in MILLIMETRES ###
-# All five lengths MUST share one unit. The IK is scale-invariant (only the
-# ratios matter), so these are entered exactly as measured - no conversion,
-# which is where the earlier mixed metre/cm values went wrong.
 L = 110.0  # plate half-width: center -> spherical joint (mm)
 L1 = 95.0  # distal link: elbow -> spherical joint (mm)
 L2 = 70.0  # proximal link: motor axis -> elbow (mm)
@@ -39,8 +35,6 @@ L3 = 90.0  # base radius: center -> motor axis (mm)
 
 h = 60.0  # global: starting/center plate height (mm) - plate begins here
 AMPLITUDE = 40.0  # mm above/below h that the plate moves.
-# At h=60 the horn sits at -19.2 deg; +/-5 keeps ~6.6 deg of margin to the
-# nearest servo limit (bras_2, -31.5 deg). +/-10 would leave only 0.4 deg.
 PERIOD_S = 4.0  # s, time for one full up/down cycle
 STEP_DT = 0.00005  # s, time between commands
 

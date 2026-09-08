@@ -4,7 +4,7 @@ Notation (matches the project's math notes):
     n = (alpha, beta, gamma)   plate normal vector (need not be unit length)
     h                          height of the plate center C = (0, 0, h)
     L                          plate half-width: center -> spherical joint
-    theta_i                    arm i's azimuth (0, 120, 240 degrees)
+    theta_i                    arm i's azimuth (0, 120, 240 degrees) 
     u_theta = (cos, sin, 0)    horizontal direction of arm i's plane
     P_i                        spherical joint at the top of arm i
     Arm.L3                     base radius: center -> motor axis
