@@ -1,11 +1,11 @@
-"""Entry point: connects PlateSim <-> PlateController."""
+"""Entry point: connects PlateSim <-> Controller."""
 
 from __future__ import annotations
 import math
 import time
 
 from src.control.pid import PID
-from src.control.controller import PlateController
+from src.control.controller import Controller
 from src.simulation.plate_sim import PlateSim, SimParams
 from src.utils import BallEstimate
 from src.simulation.renderer import Renderer
@@ -43,7 +43,7 @@ def main(realtime: bool = True, duration: float = 30.0) -> None:
         derivative_filter=0.85,
     )
 
-    controller = PlateController(pid_x, pid_y, max_tilt_rad=math.radians(15))
+    controller = Controller(pid_x, pid_y, max_tilt_rad=math.radians(15))
     controller.set_target(0.0, 0.0)
 
     renderer = Renderer(plate_radius=params.plate_radius)

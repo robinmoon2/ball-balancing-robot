@@ -41,7 +41,7 @@ class PlateSim:
         self.s.roll += alpha * (self._cmd_roll - self.s.roll)
         self.s.pitch += alpha * (self._cmd_pitch - self.s.pitch)
 
-        # Accelerations (mm/s^2). Sign matches PlateController convention:
+        # Accelerations (mm/s^2). Sign matches Controller convention:
         # +pitch -> ball accelerates in +x direction.
         k = self.p.rolling_factor * self.p.g
         ax = k * math.sin(self.s.pitch) - self.p.friction * self.s.vx

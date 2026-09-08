@@ -95,7 +95,7 @@ def test_normal_vector_board_unit_norm():
     """n = (sin(roll), -sin(pitch), sqrt(...)) should stay unit-length
     across the plate's whole commandable tilt range."""
     rng = np.random.default_rng(1)
-    max_tilt = np.radians(15)  # matches PlateController's default max_tilt_rad
+    max_tilt = np.radians(15)  # matches Controller's default max_tilt_rad
     for _ in range(50):
         pitch = rng.uniform(-max_tilt, max_tilt)
         roll = rng.uniform(-max_tilt, max_tilt)
