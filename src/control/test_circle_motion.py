@@ -50,11 +50,11 @@ from control.inverse_kinematics import (
 from control.test_vertical_motion import L, angles_out_of_range, build_arms
 
 ### CONFIG ###
-H_CIRCLE = 90.0  # mm, plate centre height held constant through the circle.
+H_CIRCLE = 120.0  # mm, plate centre height held constant through the circle.
 TILT_DEG = 20.0  # cone half-angle: how far the normal leans from vertical
-REVOLUTION_S = 1.0  # s for the tilt direction to make one full turn
+REVOLUTION_S = 2.0  # s for the tilt direction to make one full turn
 RAMP_REVOLUTIONS = 2.0  # turns spent ramping tilt 0 -> TILT_DEG (the "spiral")
-STEP_DT = 0.005  # s between commands
+STEP_DT = 0.0005  # s between commands
 
 ARM_NAMES = ("bras_1", "bras_2", "bras_3")
 
@@ -106,11 +106,14 @@ def dry_run(arms: np.ndarray) -> bool:
 
     print(f"Dry run: tilt 0 -> {TILT_DEG} deg at h={H_CIRCLE} mm, "
           f"{RAMP_REVOLUTIONS + 1:.0f} revolutions, {total_s:.1f} s")
-    for i, arm in enumerate(arms):
-        s = arm.servo
+    # q here is the RAW geometric angle from solve_servo_angles, so the bound
+    # to report against is the servo's raw travel [0, pi] - the same one
+    # angles_out_of_range checks. servo.range_min/range_max are expressed in
+    # the servo's *centered* frame and would disagree with the verdict below.
+    for i in range(len(arms)):
         print(f"  {ARM_NAMES[i]}: q {np.degrees(lo[i]):+7.2f} .. {np.degrees(hi[i]):+7.2f} deg   "
-              f"servo range [{np.degrees(s.range_min):+7.2f}, {np.degrees(s.range_max):+7.2f}]   "
-              f"margin {np.degrees(min(lo[i] - s.range_min, s.range_max - hi[i])):+6.2f} deg")
+              f"servo raw travel [   0.00,  180.00]   "
+              f"margin {min(np.degrees(lo[i]), 180.0 - np.degrees(hi[i])):+6.2f} deg")
     if problems:
         print(f"  {len(problems)} pose(s) out of range, first few:")
         for p in problems[:5]:
@@ -187,4 +190,4 @@ def main(dry: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    main(dry="--dry-run" in sys.argv)
+    main()

@@ -197,18 +197,19 @@ def test_solve_servo_angles_recovers_known_angle():
 # ---------- incline_board (full chain) ----------
 
 def test_incline_board_returns_one_angle_per_arm():
-    # incline_board uses the module-level L=5 plate radius, so these arms
-    # need enough reach (L1+L2) to actually span base -> target at that
-    # radius and height - make_arms()'s smaller defaults are unreachable
-    # here and would trip solve_bearing_positions's domain check.
-    correction = SimpleNamespace(
-        pitch_rad=np.radians(5.0),
-        roll_rad=np.radians(-3.0),
-        height_m=4.0,
-        arms=make_arms(L1=4.0, L2=4.0, L3=1.0),
+    # L is now passed explicitly (it used to come from a module-level
+    # constant of 5). These arms need enough reach (L1+L2) to actually span
+    # base -> target at that radius and height - make_arms()'s smaller
+    # defaults would trip solve_bearing_positions's domain check.
+    arms = make_arms(L1=4.0, L2=4.0, L3=1.0)
+    angles = incline_board(
+        pitch=np.radians(5.0),
+        roll=np.radians(-3.0),
+        height=4.0,
+        arms=arms,
+        L=5.0,
     )
-    angles = incline_board(correction)
-    assert len(angles) == len(correction.arms)
+    assert len(angles) == len(arms)
     assert all(np.isfinite(angles))
 
 

@@ -31,12 +31,14 @@ from control.arm import Arm
 from utils import PlateOrientation, VectorPosition
 
 
-###VARIABLES
-L = 5  # plate half-width: center -> spherical joint (m)
+def incline_board(pitch, roll, height, arms, L):
+    """Full chain: pitch/roll/height -> per-arm raw geometric servo angles.
 
-
-def incline_board(pitch, roll, height, arms): # TODO clarify the correction parameter type
-    "Do the sequence of reaction to incline the plate"
+    L (plate centre -> spherical joint) MUST be passed by the caller, in the
+    same length unit as each Arm's L1/L2/L3 and as `height`. It used to
+    default to a module-level constant of 5, which silently produced angles
+    for a 5 mm plate on a rig whose real radius is 110 mm.
+    """
     target_orientation = normal_vector_board(pitch=pitch, roll=roll, height=height)
     list_position = solve_end_effector_positions(target_orientation=target_orientation, arms=arms, L=L)
     bearing_positions = solve_bearing_positions(target_orientation=target_orientation, arms=arms, arms_end_effector=list_position, L=L)

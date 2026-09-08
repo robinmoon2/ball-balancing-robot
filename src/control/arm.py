@@ -29,8 +29,15 @@ class Arm:
         self.L3 = L3  # base radius: plate center -> motor axis
         self.mount_angle_rad = mount_angle_rad  # theta_i: this leg's azimuth
 
-    def set_angle(self, theta: float):  # in radians
-        self.servo.set_angle(theta)
+    def set_angle(self, theta: float) -> None:
+        """theta: the raw geometric joint angle from inverse_kinematics -
+        the same 0..pi frame this servo's own offset_rad was calibrated in
+        (see calibration_servo.py). Re-based here to that servo's centered
+        frame (0 = this servo's own calibrated flat position) before
+        forwarding, so IK's absolute angle and the servo's offset are never
+        both applied at once.
+        """
+        self.servo.set_angle(theta - self.servo.offset_rad)
 
     def get_azimuth(self) -> float:
         """Return this arm's azimuth angle (theta_i) in radians."""

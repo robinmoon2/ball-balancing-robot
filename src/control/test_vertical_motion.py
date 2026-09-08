@@ -76,15 +76,22 @@ def solve_angles_for_height(arms: np.ndarray, height: float) -> np.ndarray:
 
 def angles_out_of_range(arms: np.ndarray, angles: np.ndarray) -> list[str]:
     """Names of arms whose computed angle is non-finite or outside that
-    arm's own calibrated [range_min, range_max] - checked here (rather
-    than relying on Servo.set_angle's internal clamp) because clamping
-    silently drives the arm to a mechanical limit instead of refusing."""
+    servo's physical travel - checked here (rather than relying on
+    Servo.set_angle's internal clamp) because clamping silently drives the
+    arm to a mechanical limit instead of refusing.
+
+    `angles` are raw geometric IK angles (Arm.set_angle's input frame), so
+    the bound to check against is each servo's raw travel - always [0, pi]
+    (offset_rad cancels out in that conversion) - not its own
+    [range_min, range_max], which are expressed in the servo's *centered*
+    frame instead.
+    """
     if not np.isfinite(angles).all():
         return [arm.servo.name for arm, a in zip(arms, angles) if not np.isfinite(a)]
     return [
         arm.servo.name
         for arm, angle in zip(arms, angles)
-        if not (arm.servo.range_min <= angle <= arm.servo.range_max)
+        if not (0.0 <= angle <= np.pi)
     ]
 
 
