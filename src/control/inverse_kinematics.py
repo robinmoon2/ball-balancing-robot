@@ -25,33 +25,22 @@ Geometry model:
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
 import numpy as np
 
 from control.arm import Arm
+from utils import PlateOrientation, VectorPosition
 
 
 ###VARIABLES
 L = 5  # plate half-width: center -> spherical joint (m)
 
-@dataclass
-class PlateOrientation:
-    n: tuple[float, float, float]  # (alpha, beta, gamma), need not be unit
-    h: float  # height of plate center above the motor-axis (z=0) plane
 
-@dataclass
-class VectorPosition:
-    x:float
-    y:float
-    z:float
-
-
-def incline_board(correction): # TODO clarify the correction parameter type
+def incline_board(pitch, roll, height, arms): # TODO clarify the correction parameter type
     "Do the sequence of reaction to incline the plate"
-    target_orientation = normal_vector_board(pitch=correction.pitch_rad, roll=correction.roll_rad, height=correction.height_m)
-    list_position = solve_end_effector_positions(target_orientation=target_orientation, arms=correction.arms, L=L)
-    bearing_positions = solve_bearing_positions(target_orientation=target_orientation, arms=correction.arms, arms_end_effector=list_position, L=L)
-    arms_angles = solve_servo_angles(correction.arms, bearing_positions)
+    target_orientation = normal_vector_board(pitch=pitch, roll=roll, height=height)
+    list_position = solve_end_effector_positions(target_orientation=target_orientation, arms=arms, L=L)
+    bearing_positions = solve_bearing_positions(target_orientation=target_orientation, arms=arms, arms_end_effector=list_position, L=L)
+    arms_angles = solve_servo_angles(arms, bearing_positions)
     return arms_angles
     
 def normal_vector_board(pitch: float, roll: float, height: float) -> PlateOrientation:

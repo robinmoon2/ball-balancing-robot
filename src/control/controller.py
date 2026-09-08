@@ -1,24 +1,10 @@
 """Plate controller: ball state -> (roll, pitch) commands."""
 
 from __future__ import annotations
-from dataclasses import dataclass
 import math
 
 from .pid import PID
-
-@dataclass
-class BallState:
-    x: float  # mm, plate frame
-    y: float  # mm
-    vx: float = 0.0  # mm/s
-    vy: float = 0.0
-    found: bool = True
-
-
-@dataclass
-class PlateCommand:
-    roll: float  # rad, rotation about plate X axis
-    pitch: float  # rad, rotation about plate Y axis
+from utils import BallEstimate, PlateCommand
 
 
 class PlateController:
@@ -48,8 +34,8 @@ class PlateController:
         self.pid_x.reset()
         self.pid_y.reset()
 
-    def update(self, state: BallState, dt: float) -> PlateCommand:
-        if not state.found:
+    def update(self, state: BallEstimate, dt: float) -> PlateCommand:
+        if not state.valid:
             # Safety: hold flat. Reset integrators to avoid windup during loss.
             self.reset()
             return PlateCommand(roll=0.0, pitch=0.0)

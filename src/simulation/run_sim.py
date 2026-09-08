@@ -5,8 +5,9 @@ import math
 import time
 
 from src.control.pid import PID
-from src.control.controller import PlateController, BallState
+from src.control.controller import PlateController
 from src.simulation.plate_sim import PlateSim, SimParams
+from src.utils import BallEstimate
 from src.simulation.renderer import Renderer
 
 
@@ -68,7 +69,7 @@ def main(realtime: bool = True, duration: float = 30.0) -> None:
                 vy = (ym - prev_xy[1]) / control_dt
             if found:
                 prev_xy = (xm, ym)
-            state = BallState(x=xm, y=ym, vx=vx, vy=vy, found=found)
+            state = BallEstimate(x=xm, y=ym, vx=vx, vy=vy, t=t, valid=found)
             cmd = controller.update(state, control_dt)
             sim.set_command(cmd.roll, cmd.pitch)
 

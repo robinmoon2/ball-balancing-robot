@@ -1,32 +1,9 @@
 """2D physics: ball rolling on a plate with small tilt angles."""
 
 from __future__ import annotations
-from dataclasses import dataclass
 import math
 
-
-@dataclass
-class SimParams:
-    g: float = 9810.0  # mm/s^2  (note: mm units!)
-    friction: float = 0.5  # viscous damping (1/s)
-    plate_radius: float = 100.0  # mm; ball falls off beyond this
-    # Rolling factor: for a solid sphere, effective accel = (5/7)*g*sin(theta).
-    # For a ping pong ball (thin shell): (3/5)*g*sin(theta).
-    rolling_factor: float = 3.0 / 5.0
-    measurement_noise_std: float = 0.5  # mm, gaussian noise on measured pos
-    actuator_lag_tau: float = 0.04  # s, first-order lag on plate angles
-    detection_dropout_prob: float = 0.0  # chance per step the ball is "lost"
-
-
-@dataclass
-class SimState:
-    x: float = 30.0
-    y: float = -20.0
-    vx: float = 0.0
-    vy: float = 0.0
-    roll: float = 0.0  # actual plate roll (after lag)
-    pitch: float = 0.0  # actual plate pitch (after lag)
-    on_plate: bool = True
+from src.utils import SimParams, SimState
 
 
 class PlateSim:

@@ -1,18 +1,10 @@
 """Orange-mass detector using a per-pixel 'orangeness' score in RGB."""
 
 from __future__ import annotations
-from dataclasses import dataclass
 import cv2
 import numpy as np
 
-
-@dataclass
-class Detection:
-    found: bool
-    x: int = 0
-    y: int = 0
-    area: int = 0
-    score: float = 0.0  # mean orangeness of the detected blob
+from utils import Detection
 
 
 class OrangeDetector:
