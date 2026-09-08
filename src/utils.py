@@ -105,6 +105,34 @@ class Detection:
     score: float = 0.0  # mean orangeness of the detected blob
 
 
+# --- from perception/perception.py ------------------------------------------
+
+
+@dataclass
+class Calibration:
+    """Pixel -> plate-frame mm, for a camera on-axis with the plate normal
+    (looking straight down from above, or straight up from below, as on
+    this rig). Perspective correction (a homography) isn't needed at this
+    angle - only scale, an origin, and possibly a mirrored axis.
+
+    Measure by placing the ball at a known plate-frame position (e.g. the
+    center, and one point at a known radius) and reading off its pixel
+    coords from Detection.
+    """
+
+    origin_px: tuple[float, float]  # pixel coords of the plate center (0, 0)
+    mm_per_px: float  # physical size of one pixel, at the plate
+    flip_x: bool = False
+    flip_y: bool = True  # image rows grow downward; plate +Y is up
+
+    def to_mm(self, x_px: float, y_px: float) -> tuple[float, float]:
+        dx = x_px - self.origin_px[0]
+        dy = y_px - self.origin_px[1]
+        x_mm = (-dx if self.flip_x else dx) * self.mm_per_px
+        y_mm = (-dy if self.flip_y else dy) * self.mm_per_px
+        return x_mm, y_mm
+
+
 # --- from estimation/estimation.py ------------------------------------------
 
 
