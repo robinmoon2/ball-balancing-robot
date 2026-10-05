@@ -52,11 +52,6 @@ max_timeout_seconds = 0.25
 #Variables for control 
 PID_X = PID(kp=0.003,ki=0.001,kd=-0.005)
 PID_Y = PID(kp=0.003,ki=0.001,kd=-0.005)
-# Per-axis limit. Roll and pitch clamp independently, so the worst-case
-# COMBINED tilt is sqrt(2)x this - at 20 deg that was 28 deg, which the arms
-# cannot reach and Actuation rightly refused. 8 deg keeps the combined worst
-# case at ~11 deg, reachable at both h=60 and h=130. Raise it once h is
-# measured and you know the real workspace.
 max_tilt_rad = np.radians(8)
 
 # Variables for arms
