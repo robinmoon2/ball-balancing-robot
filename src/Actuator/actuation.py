@@ -60,7 +60,7 @@ class Actuation:
         arms: np.ndarray,
         plate_radius: float,
         neutral_height: float,
-        max_rate_rad_s: float | None = 6.0,
+        max_rate_rad_s: float | None = 2.0,
         max_command_rad: float = np.pi,
         dry_run: bool = False,
     ):

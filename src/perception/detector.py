@@ -4,7 +4,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from utils import Detection
+from src.utils import Detection
 
 
 class OrangeDetector:
@@ -18,9 +18,22 @@ class OrangeDetector:
       - (1 - |R - 2G|) high     -> orange has G ~ R/2; penalizes pure red
     """
 
-    def __init__(self, min_area: int = 200, score_threshold: float = 0.15):
+    def __init__(
+        self,
+        min_area: int = 200,
+        score_threshold: float = 0.15,
+        u_max: int | None = None,
+        v_min: int | None = None,
+        y_min: int = 40,
+    ):
         self.min_area = min_area
         self.score_threshold = score_threshold
+        # Chroma bounds for detect_yuv. None = not calibrated yet; run
+        # `python -m src.perception.calibrate_yuv` with the ball on the
+        # plate to measure them under your own lighting.
+        self.u_max = u_max
+        self.v_min = v_min
+        self.y_min = y_min
 
     @staticmethod
     def _orangeness(frame_bgr: np.ndarray) -> np.ndarray:
@@ -58,3 +71,54 @@ class OrangeDetector:
         mean_score = float(score_map[blob_mask == 255].mean())
 
         return Detection(found=True, x=cx, y=cy, area=area, score=mean_score)
+
+    def detect_yuv(self, frame) -> Detection:
+        """Same job as detect(), straight off the I420 chroma planes.
+
+        ~100x cheaper than detect(): no JPEG decode, no float32 temporaries,
+        and U/V are already half-resolution, so this thresholds 320x240
+        instead of scanning 640x480x3. Takes a camera.Frame, not an array.
+
+        The DISCRIMINANT IS NOT THE SAME as detect(). detect() separates
+        orange from pure red via the (1 - |R - 2G|) term; a high-V threshold
+        alone does not - red and orange both sit high in V. The y_min floor
+        rejects dark red, but if anything red shares the plate you want
+        detect() or a tighter u_max. Bounds must be calibrated for your ball
+        and lighting: see calibrate_yuv.
+
+        Returns pixel coordinates in FULL-resolution units, so it is
+        interchangeable with detect() as far as Calibration is concerned.
+        """
+        if self.u_max is None or self.v_min is None:
+            raise ValueError(
+                "detect_yuv needs calibrated chroma bounds; u_max/v_min are unset. "
+                "Run `python -m src.perception.calibrate_yuv` first, or use detect()."
+            )
+
+        mask = cv2.inRange(frame.v, self.v_min, 255)
+        cv2.bitwise_and(mask, cv2.inRange(frame.u, 0, self.u_max), dst=mask)
+        # Luma is full-res; sample it at chroma resolution to reject dark
+        # pixels that happen to land in the orange chroma box.
+        cv2.bitwise_and(mask, cv2.inRange(frame.y[::2, ::2], self.y_min, 255), dst=mask)
+
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return Detection(found=False)
+
+        largest = max(contours, key=cv2.contourArea)
+        # Chroma is half-resolution in each axis, so one chroma pixel is
+        # four full-res pixels: scale the area before comparing to min_area.
+        area = int(cv2.contourArea(largest)) * 4
+        if area < self.min_area:
+            return Detection(found=False)
+
+        M = cv2.moments(largest)
+        if M["m00"] == 0:
+            return Detection(found=False)
+        cx = int(2 * M["m10"] / M["m00"])
+        cy = int(2 * M["m01"] / M["m00"])
+
+        return Detection(found=True, x=cx, y=cy, area=area, score=1.0)

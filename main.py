@@ -37,20 +37,21 @@ def build_arms(pca) -> np.ndarray:
 
 # Variables for perception
 camera_source: int = 0
-camera_height: int = 480
-camera_width: int = 640
+camera_height: int = 480  # must be a multiple of 16 (I420 plane alignment)
+camera_width: int = 640  # must be a multiple of 32
+camera_framerate: int = 30
 detection_min_area: int = 200
 score_threshold: int = 0.15
 
 # Variables for estimation
-process_noise_std: float = 1500.0
+process_noise_std: float = 200.0
 measurement_noise_std: float = 1.5
 warmup_ticks: int = 5
 max_timeout_seconds = 0.25
 
 #Variables for control 
-PID_X = PID(kp=0.0035,ki=0.0,kd=0.0008)
-PID_Y = PID(kp=0.0035,ki=0.0,kd=0.0008)
+PID_X = PID(kp=0.003,ki=0.001,kd=-0.005)
+PID_Y = PID(kp=0.003,ki=0.001,kd=-0.005)
 # Per-axis limit. Roll and pitch clamp independently, so the worst-case
 # COMBINED tilt is sqrt(2)x this - at 20 deg that was 28 deg, which the arms
 # cannot reach and Actuation rightly refused. 8 deg keeps the combined worst
@@ -60,16 +61,16 @@ max_tilt_rad = np.radians(8)
 
 # Variables for arms
 
-L = 110.0  # plate half-width: center -> spherical joint (mm)
-L1 = 95.0  # distal link: elbow -> spherical joint (mm)
-L2 = 70.0  # proximal link: motor axis -> elbow (mm)
+L = 150.0  # plate half-width: center -> spherical joint (mm)
+L1 = 116.0  # distal link: elbow -> spherical joint (mm)
+L2 = 100.0  # proximal link: motor axis -> elbow (mm)
 L3 = 90.0  # base radius: center -> motor axis (mm)
 
-h = 60.0  # global: starting/center plate height (mm) - plate begins here
+h = 70.0  # global: starting/center plate height (mm) - plate begins here
 
-OFFSET_ARM_1 = 0.66+0.66  # rad, from calibration_servo.py
-OFFSET_ARM_2 = 0.55+0.55
-OFFSET_ARM_3 = 0.8+0.75
+OFFSET_ARM_1 = 0.4 # rad, from calibration_servo.py
+OFFSET_ARM_2 = 0.1
+OFFSET_ARM_3 = 0.3
 
 # Physical mount azimuth of each named arm (bras_1/2/3, matching
 # calibration_servo.py) - NOT in numeric order: arm 2 sits at 0 deg,
@@ -95,7 +96,8 @@ print("Starting main.py")
 # real units.
 perception = Perception(calibration=Calibration(origin_px=(camera_width / 2, camera_height / 2),
                                                 mm_per_px=0.14),
-                        camera=Camera(source=camera_source,width=camera_width,height=camera_height),
+                        camera=Camera(source=camera_source,width=camera_width,height=camera_height,
+                                      framerate=camera_framerate),
                         detector=OrangeDetector(min_area=detection_min_area,score_threshold=score_threshold)
                         )
 
@@ -168,7 +170,12 @@ try:
         ball_position_mm = perception.read()
 
         # Estimation: ball position in mm, with velocity and a validity flag.
-        estimated_state = estimation.update(ball_position_mm, t)
+        # Timestamped with when the FRAME was captured, not with `t` (which
+        # was read before perception.read() blocked): fusing a measurement
+        # under a later timestamp tells the filter the ball was at that
+        # position more recently than it was, and the resulting error grows
+        # with the ball's speed times the latency.
+        estimated_state = estimation.update(ball_position_mm, perception.last_capture_t)
 
         # Control: PID -> plate orientation command (roll/pitch)
         plate_command = controller.update(estimated_state, dt)
@@ -196,7 +203,6 @@ try:
             do_print=do_print,
         )
 
-        time.sleep(0.01)  # Loop delay to prevent CPU overload
 finally:
     log_file.close()
     print(f"\nWrote {LOG_PATH}")

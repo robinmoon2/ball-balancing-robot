@@ -17,9 +17,5 @@ dependencies = [
     "rpi-gpio>=0.7.1",
 ]
 
-[project.scripts]
-ball-balancing-robot = "ball_balancing_robot:main"
-
-[build-system]
-requires = ["uv_build>=0.12.9,<0.13.0"]
-build-backend = "uv_build"
+[tool.uv]
+package = false

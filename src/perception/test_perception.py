@@ -1,6 +1,14 @@
 """Live demo: show camera feed with a green dot on the most orange mass."""
 
 from __future__ import annotations
+import sys
+from pathlib import Path
+
+# Let this file be run directly (`uv run src/perception/test_perception.py`)
+# without `-m`: that invocation puts this file's own directory on sys.path
+# instead of the repo root, which the `src.`-prefixed imports below need.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 import cv2
 import numpy as np
 import os

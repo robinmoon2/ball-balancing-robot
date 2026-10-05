@@ -3,9 +3,9 @@
 import numpy as np
 from Servo import Servo, create_pca
 
-OFFSET_ARM_1 = 0.66  # rad
-OFFSET_ARM_2 = 0.55  # rad
-OFFSET_ARM_3 = 0.8   # rad
+OFFSET_ARM_1 = 0.4  # rad
+OFFSET_ARM_2 = 0.1  # rad
+OFFSET_ARM_3 = 0.3   # rad
 
 
 def main():

@@ -50,9 +50,15 @@ from control.inverse_kinematics import (
 from control.test_vertical_motion import L, angles_out_of_range, build_arms
 
 ### CONFIG ###
-H_CIRCLE = 120.0  # mm, plate centre height held constant through the circle.
-TILT_DEG = 20.0  # cone half-angle: how far the normal leans from vertical
-REVOLUTION_S = 2.0  # s for the tilt direction to make one full turn
+H_CIRCLE = 170.0  # mm, plate centre height held constant through the circle.
+# NB: this is not a free choice. The raw IK angle for a flat plate rises with
+# height (h=150 -> q=16 deg, h=170 -> q=26 deg), and the cone swings each arm
+# ~ +/-21 deg about that value at TILT_DEG=20. At h=150 the bottom of that
+# swing crosses the servos' raw 0 deg hard stop; h=170 leaves ~8 deg of margin
+# there while staying well clear of the reach limit (poses go unreachable
+# above h~185 at large tilt).
+TILT_DEG = 17.0  # cone half-angle: how far the normal leans from vertical
+REVOLUTION_S = 1.0  # s for the tilt direction to make one full turn
 RAMP_REVOLUTIONS = 2.0  # turns spent ramping tilt 0 -> TILT_DEG (the "spiral")
 STEP_DT = 0.0005  # s between commands
 
@@ -190,4 +196,4 @@ def main(dry: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(dry="--dry-run" in sys.argv[1:])
