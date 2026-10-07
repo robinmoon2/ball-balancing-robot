@@ -36,7 +36,7 @@ class PID:
         self._prev_error = None
         self._prev_derivative = 0.0
 
-    def update(self, error: float, dt: float) -> float:
+    def update(self, error: float, speed: float, dt: float) -> float:
         if dt <= 0:
             raise ValueError("dt must be positive")
 
@@ -55,7 +55,7 @@ class PID:
         derivative = a * self._prev_derivative + (1 - a) * raw_deriv
 
         # Output
-        output = self.kp * error + self.ki * self._integral + self.kd * derivative
+        output = self.kp * error + self.ki * self._integral + self.kd * speed#derivative
 
         # Output saturation
         lo, hi = self.output_limits

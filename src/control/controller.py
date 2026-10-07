@@ -55,8 +55,8 @@ class Controller:
         ex = state.x - self.target[0]
         ey = state.y - self.target[1]
 
-        pitch = -self.pid_x.update(ex, dt)
-        roll = self.pid_y.update(ey, dt)
+        pitch = -self.pid_x.update(ex, state.vx, dt)
+        roll = self.pid_y.update(ey, state.vy, dt)
 
         # Hard clamp for safety
         pitch = max(-self.max_tilt, min(self.max_tilt, pitch))

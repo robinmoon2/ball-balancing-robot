@@ -18,7 +18,8 @@ import numpy as np
 # Every run appends a row per tick here. This is what makes PID tuning
 # measurable instead of guesswork - plot x_mm/y_mm against t to see
 # overshoot, oscillation period and settling time.
-LOG_PATH = "tuning_log.csv"
+now = time.strftime("%Y-%m-%d_%H-%M-%S")
+LOG_PATH = f"tuning_log_{now}.csv"
 
 def build_arms(pca) -> np.ndarray:
     arm_1 = Arm(
@@ -44,7 +45,7 @@ detection_min_area: int = 200
 score_threshold: int = 0.15
 
 # Variables for estimation
-process_noise_std: float = 200.0
+process_noise_std: float = 1500.0
 measurement_noise_std: float = 1.5
 warmup_ticks: int = 5
 max_timeout_seconds = 0.25
@@ -77,8 +78,6 @@ MOUNT_ANGLE_ARM_3 = np.radians(120.0)
 pca = create_pca()
 arms: np.ndarray = build_arms(pca)
 
-print("Starting main.py")
-
 ## Initialize components
 
 # Initialize principals components 
@@ -99,16 +98,13 @@ perception = Perception(calibration=Calibration(origin_px=(camera_width / 2, cam
 estimation = Estimation(process_noise_std=process_noise_std,measurement_noise_std=measurement_noise_std, warmup_ticks=warmup_ticks,max_dropout_seconds=max_timeout_seconds)
 controller = Controller(pid_x=PID_X, pid_y=PID_Y,max_tilt_rad=max_tilt_rad)
 controller.set_target(0.0, 0.0)
-actuator = Actuation(arms=arms, plate_radius=L, neutral_height=h)
+actuator = Actuation(arms=arms, plate_radius=L, neutral_height=h, max_raate_rad_s=5.0)
 
-print("initialisation complete")
+print("INITIALISATION COMPLETE: starting main loop. Press Ctrl+C to stop and write log.")
 
 log_file = open(LOG_PATH, "w", newline="")
 log = csv.writer(log_file)
-log.writerow(["t", "dt", "found", "px", "py", "frac_x", "frac_y",
-              "x_mm", "y_mm", "vx", "vy", "valid",
-              "roll_cmd", "pitch_cmd", "applied",
-              "arm1_delta", "arm2_delta", "arm3_delta"])
+log.writerow(["dt","dt_detection","dt_estimation","dt_control","dt_actuation"]) #dt is the global time between each loop
 
 # Centre of the camera frame - the target the ball is driven towards.
 FRAME_CX = camera_width / 2.0
@@ -116,44 +112,11 @@ FRAME_CY = camera_height / 2.0
 PRINT_EVERY_S = 0.2  # console is rate-limited; the CSV gets every tick
 
 
-def log_tick(t_rel, dt, detection, state, command, deltas, applied, do_print):
-    """Record one tick: where the ball is, and what the arms did about it.
-
-    The ball is reported three ways - raw pixels, as a fraction of the
-    camera's own limits (0 = centre of frame, +/-1 = edge of frame), and in
-    mm via the calibration. The arm action is each arm's movement away from
-    its own calibrated flat position, so 0,0,0 means a level plate.
-    """
-    if detection.found:
-        frac_x = (detection.x - FRAME_CX) / FRAME_CX
-        frac_y = (detection.y - FRAME_CY) / FRAME_CY
-        where = (f"ball px=({detection.x:4d},{detection.y:4d}) "
-                 f"frame=({frac_x:+.2f},{frac_y:+.2f}) "
-                 f"mm=({state.x:+7.1f},{state.y:+7.1f})")
-    else:
-        frac_x = frac_y = float("nan")
-        where = f"ball NOT FOUND{'':>44}"
-
-    if applied:
-        action = "arms " + " ".join(f"{d:+.3f}" for d in deltas)
-    else:
-        action = "arms HOLD (estimate not valid)"
-
-    if do_print:
-        print(f"{where} | roll={command.roll:+.3f} pitch={command.pitch:+.3f} | {action}")
-
-    log.writerow([
-        f"{t_rel:.4f}", f"{dt:.4f}", int(detection.found),
-        detection.x, detection.y, f"{frac_x:.4f}", f"{frac_y:.4f}",
-        f"{state.x:.2f}", f"{state.y:.2f}",
-        f"{state.vx:.1f}", f"{state.vy:.1f}", int(state.valid),
-        f"{command.roll:.4f}", f"{command.pitch:.4f}", int(applied),
-        *(f"{d:.4f}" for d in deltas),
-    ])
+def log_tick(dt,dt_detection, dt_estimation, dt_control, dt_actuation):
+    log.writerow([dt, dt_detection, dt_estimation, dt_control, dt_actuation])
 
 
 t0 = time.monotonic()
-last_print = 0.0
 last_t = time.monotonic()
 try:
     while True:
@@ -162,19 +125,24 @@ try:
         last_t = t
 
         # Perception: pixel -> frame-centred mm, or None if no ball this frame.
+        t_detection_start = time.monotonic()
         ball_position_mm = perception.read()
-
-        # Estimation: ball position in mm, with velocity and a validity flag.
-        # Timestamped with when the FRAME was captured, not with `t` (which
-        # was read before perception.read() blocked): fusing a measurement
-        # under a later timestamp tells the filter the ball was at that
-        # position more recently than it was, and the resulting error grows
-        # with the ball's speed times the latency.
+        
+        t_detection_end = time.monotonic()
+        dt_detection = t_detection_end - t_detection_start
+        
+        t_estimation_start = time.monotonic()
         estimated_state = estimation.update(ball_position_mm, perception.last_capture_t)
 
-        # Control: PID -> plate orientation command (roll/pitch)
-        plate_command = controller.update(estimated_state, dt)
+        t_estimation_end = time.monotonic()
+        dt_estimation = t_estimation_end - t_estimation_start
 
+
+        # Control: PID -> plate orientation command (roll/pitch)
+        t_control_start = time.monotonic()
+        plate_command = controller.update(estimated_state, dt)
+        t_control_end = time.monotonic()
+        dt_control = t_control_end - t_control_start
         # Actuation: only move while the estimate is trustworthy. With no
         # ball (or during warm-up) we hold the last commanded pose rather
         # than re-levelling, so the plate doesn't twitch every time
@@ -182,20 +150,21 @@ try:
         # so there's no windup to catch up on when the ball comes back.
         applied = estimated_state.valid
         if applied:
+            dt_actuation_start = time.monotonic()
             actuator.apply(plate_command, dt)
-
+            dt_actuation_end = time.monotonic()
+            dt_actuation = dt_actuation_end - dt_actuation_start
+        else:
+            dt_actuation = 0.0
         do_print = (t - last_print) >= PRINT_EVERY_S
         if do_print:
             last_print = t
         log_tick(
-            t_rel=t - t0,
-            dt=dt,
-            detection=perception.last_detection,
-            state=estimated_state,
-            command=plate_command,
-            deltas=actuator.last_deltas,
-            applied=applied,
-            do_print=do_print,
+            dt,
+            dt_detection,
+            dt_estimation,
+            dt_control,
+            dt_actuation
         )
 
 finally:
