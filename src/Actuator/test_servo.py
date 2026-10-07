@@ -3,9 +3,9 @@
 import numpy as np
 from Servo import Servo, create_pca
 
-OFFSET_ARM_1 = 0.4  # rad
-OFFSET_ARM_2 = 0.1  # rad
-OFFSET_ARM_3 = 0.3   # rad
+OFFSET_ARM_1 = 0.5  # rad
+OFFSET_ARM_2 = 0.4  # rad
+OFFSET_ARM_3 = 0.4  # rad
 
 
 def main():
@@ -31,6 +31,7 @@ def main():
         print("\nCommandes :")
         print("  numéro angle   → ex: 2 -0.3")
         print("  offset num val → ex: offset 1 0.7")
+        print("  reverse num    → inverse le sens du bras, ex: reverse 1")
         print("  flat           → tous les servos à 0 (neutre)")
         print("  q              → quitter\n")
 
@@ -64,6 +65,28 @@ def main():
                     f"Offset bras_{numero} = {new_offset:.4f} rad  "
                     f"plage : [{servos[numero].range_min:.2f}, "
                     f"{servos[numero].range_max:.2f}]"
+                )
+                continue
+
+            if len(valeurs) == 2 and valeurs[0] == "reverse":
+                try:
+                    numero = int(valeurs[1])
+                except ValueError:
+                    print("Format : reverse numéro_servo")
+                    continue
+                if numero not in servos:
+                    print("Servo invalide. Choisissez 1, 2 ou 3.")
+                    continue
+                servo = servos[numero]
+                # Garde la position physique actuelle : elle devient le
+                # nouveau 0, seul le sens de rotation change.
+                raw = float(np.clip(servo.offset_rad + servo.get_angle(), 0.0, np.pi))
+                servo.reverse = not servo.reverse
+                servo.offset_rad = np.pi - raw
+                servo.set_angle(0.0)
+                print(
+                    f"{servo.name} : reverse={servo.reverse}, "
+                    f"offset={servo.offset_rad:.4f} rad (position inchangée)"
                 )
                 continue
 
@@ -111,7 +134,10 @@ def main():
 
         print("\nOffsets finaux à reporter :")
         for num, servo in servos.items():
-            print(f"  OFFSET_ARM_{num} = {servo.offset_rad}")
+            print(
+                f"  OFFSET_ARM_{num} = {servo.offset_rad}  "
+                f"(reverse={servo.reverse})"
+            )
         print("Programme terminé.")
 
 

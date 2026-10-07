@@ -30,7 +30,7 @@ from control.inverse_kinematics import (
 
 L = 120.0  # plate half-width: center -> spherical joint (mm)
 L1 = 140.0  # distal link: elbow -> spherical joint (mm)
-L2 = 105.0  # proximal link: motor axis -> elbow (mm)
+L2 = 120.0  # proximal link: motor axis -> elbow (mm)
 L3 = 90.0  # base radius: center -> motor axis (mm)
 
 h = 180.0  # global: starting/center plate height (mm) - plate begins here
@@ -39,8 +39,8 @@ PERIOD_S = 1.0  # s, time for one full up/down cycle
 STEP_DT = 0.00005  # s, time between commands
 
 OFFSET_ARM_1 = 0.5  # rad, from calibration_servo.py
-OFFSET_ARM_2 = 0.1
-OFFSET_ARM_3 = 0.3
+OFFSET_ARM_2 = 0.4
+OFFSET_ARM_3 = 0.4
 
 # Physical mount azimuth of each named arm (bras_1/2/3, matching
 # calibration_servo.py) - NOT in numeric order: arm 2 sits at 0 deg,

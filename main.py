@@ -50,23 +50,28 @@ measurement_noise_std: float = 1.5
 warmup_ticks: int = 5
 max_timeout_seconds = 0.25
 
-#Variables for control 
-PID_X = PID(kp=0.003,ki=0.001,kd=-0.005)
-PID_Y = PID(kp=0.003,ki=0.001,kd=-0.005)
+#Variables for control
+G_EFF = 6000.0          # mm/s² per rad (hollow ball; ~7000 if solid)
+WN, ZETA = 4.0, 0.8
+KP = WN**2 / G_EFF               # ≈ 0.0027 rad/mm
+KD = 2 * ZETA * WN / G_EFF       # ≈ 0.0011 rad/(mm/s)
+PID_X = PID(kp=KP, ki=0.0, kd=KD)
+PID_X = PID(kp=0.0027,ki=0.0,kd=0.0011)
+PID_Y = PID(kp=0.0027,ki=0.0,kd=0.0011)
 max_tilt_rad = np.radians(8)
 
 # Variables for arms
 
 L = 150.0  # plate half-width: center -> spherical joint (mm)
-L1 = 116.0  # distal link: elbow -> spherical joint (mm)
-L2 = 100.0  # proximal link: motor axis -> elbow (mm)
+L1 = 140.0  # distal link: elbow -> spherical joint (mm)
+L2 = 120.0  # proximal link: motor axis -> elbow (mm)
 L3 = 90.0  # base radius: center -> motor axis (mm)
 
-h = 70.0  # global: starting/center plate height (mm) - plate begins here
+h = 180.0  # global: starting/center plate height (mm) - plate begins here
 
-OFFSET_ARM_1 = 0.4 # rad, from calibration_servo.py
-OFFSET_ARM_2 = 0.1
-OFFSET_ARM_3 = 0.3
+OFFSET_ARM_1 = 0.5 # rad, from calibration_servo.py
+OFFSET_ARM_2 = 0.4
+OFFSET_ARM_3 = 0.4
 
 # Physical mount azimuth of each named arm (bras_1/2/3, matching
 # calibration_servo.py) - NOT in numeric order: arm 2 sits at 0 deg,
@@ -104,7 +109,8 @@ print("INITIALISATION COMPLETE: starting main loop. Press Ctrl+C to stop and wri
 
 log_file = open(LOG_PATH, "w", newline="")
 log = csv.writer(log_file)
-log.writerow(["dt","dt_detection","dt_estimation","dt_control","dt_actuation"]) #dt is the global time between each loop
+log.writerow(["dt","dt_detection","dt_estimation","dt_control","dt_actuation",
+              "valid","x_mm","y_mm","vx","vy","roll","pitch"]) #dt is the global time between each loop
 
 # Centre of the camera frame - the target the ball is driven towards.
 FRAME_CX = camera_width / 2.0
@@ -112,8 +118,10 @@ FRAME_CY = camera_height / 2.0
 PRINT_EVERY_S = 0.2  # console is rate-limited; the CSV gets every tick
 
 
-def log_tick(dt,dt_detection, dt_estimation, dt_control, dt_actuation):
-    log.writerow([dt, dt_detection, dt_estimation, dt_control, dt_actuation])
+def log_tick(dt,dt_detection, dt_estimation, dt_control, dt_actuation, state, command):
+    log.writerow([dt, dt_detection, dt_estimation, dt_control, dt_actuation,
+                  int(state.valid), state.x, state.y, state.vx, state.vy,
+                  command.roll, command.pitch])
 
 
 t0 = time.monotonic()
@@ -165,7 +173,9 @@ try:
             dt_detection,
             dt_estimation,
             dt_control,
-            dt_actuation
+            dt_actuation,
+            estimated_state,
+            plate_command,
         )
 
 finally:
