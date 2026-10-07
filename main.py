@@ -98,7 +98,7 @@ perception = Perception(calibration=Calibration(origin_px=(camera_width / 2, cam
 estimation = Estimation(process_noise_std=process_noise_std,measurement_noise_std=measurement_noise_std, warmup_ticks=warmup_ticks,max_dropout_seconds=max_timeout_seconds)
 controller = Controller(pid_x=PID_X, pid_y=PID_Y,max_tilt_rad=max_tilt_rad)
 controller.set_target(0.0, 0.0)
-actuator = Actuation(arms=arms, plate_radius=L, neutral_height=h, max_raate_rad_s=5.0)
+actuator = Actuation(arms=arms, plate_radius=L, neutral_height=h, max_rate_rad_s=5.0)
 
 print("INITIALISATION COMPLETE: starting main loop. Press Ctrl+C to stop and write log.")
 
@@ -117,6 +117,7 @@ def log_tick(dt,dt_detection, dt_estimation, dt_control, dt_actuation):
 
 
 t0 = time.monotonic()
+last_print= t0
 last_t = time.monotonic()
 try:
     while True:
