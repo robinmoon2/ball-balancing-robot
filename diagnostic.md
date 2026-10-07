@@ -86,7 +86,7 @@ Rule of thumb: a ball-balancing plate feels responsive below about 60–80 ms. T
 
 ## Details and fixes
 
-### P0-1 — Derivative gain has the wrong sign 🔴
+### P0-1 — Derivative gain has the wrong sign 🔴 
 `main.py:53-54`
 ```python
 PID_X = PID(kp=0.003, ki=0.001, kd=-0.005)
@@ -95,7 +95,7 @@ For a PD loop, `kp` and `kd` must have the **same sign**, whatever the plate's s
 
 **Fix:** use `kd = +0.001 … +0.002` to start, then tune it upward.
 
-### P0-2 — D term is noise-dominated 🔴
+### P0-2 — D term is noise-dominated | CLEAR
 `src/utils.py:281` computes `(error - prev_error) / dt` on the filtered position. Measured with a **still** ball (1.5 mm detector noise, 30 Hz):
 - finite-difference derivative noise: **21.4 mm/s std**, so `|kd|·21.4 = 0.107 rad` of random tilt (the limit is 0.140 rad)
 - the Kalman filter's own velocity `vx`: **6.6 mm/s std**, about 3× cleaner and with no extra delay
@@ -108,13 +108,6 @@ pitch = -(kp*ex + ki*Ix + kd*state.vx)
 ```
 Alternatively, set `derivative_filter=0.5–0.7`, which is simpler but adds lag.
 
-### P0-3 — Corrupted git repo and unclean shutdowns 🔴 (not lag, but urgent)
-`git log` gives `object file .git/objects/56/b309… is empty — fatal: bad object HEAD`, and the kernel reported an orphan cleanup at boot. The robot was probably powered off by unplugging it while files were being written. A `.git/corrupt-objects-backup` folder suggests someone has already tried a repair.
-
-**Fix:**
-1. Copy the working tree somewhere safe now (`cp -a ~/ball-balancing-robot ~/bbr-backup`).
-2. Recover from GitHub (`origin = github.com:robinmoon2/ball-balancing-robot`): clone fresh and copy your working files over it.
-3. Always `sudo shutdown now` before cutting power. Consider a better SD card (Samsung/SanDisk "A1/A2" class) and a power switch that doesn't cut the Pi.
 
 ### P1-4 — Slow colour detector 🟠
 `src/perception/perception.py:689` defaults to `use_yuv=False`, so each frame takes 24 ms of float math on 640×480×3 pixels.
