@@ -50,6 +50,8 @@ numeric diff in the text panel. "Clear A/B" drops them.
 
 from __future__ import annotations
 
+import ast
+import operator
 import sys
 import types
 from pathlib import Path
@@ -101,9 +103,73 @@ from control.inverse_kinematics import (
 from utils import PlateOrientation
 
 # --------------------------------------------------------------------------
-# Defaults - taken from main.py's current geometry, so the tool opens on the
+# Defaults - read from main.py's current geometry, so the tool opens on the
 # rig's actual configuration rather than an arbitrary guess.
 # --------------------------------------------------------------------------
+
+MAIN_PY = Path(__file__).resolve().parents[2] / "main.py"
+
+# Used only if main.py can't be read/parsed (or a name is missing there).
+FALLBACK_MAIN = dict(
+    L=150.0, L1=140.0, L2=120.0, L3=90.0, h=150.0, MAX_TILT_DEG=20.0,
+    OFFSET_ARM_1=0.9, OFFSET_ARM_2=0.85, OFFSET_ARM_3=0.85,
+    MOUNT_ANGLE_ARM_1=np.radians(240.0), MOUNT_ANGLE_ARM_2=np.radians(0.0),
+    MOUNT_ANGLE_ARM_3=np.radians(120.0), mm_per_px=0.14,
+)
+
+_BINOPS = {ast.Add: operator.add, ast.Sub: operator.sub,
+           ast.Mult: operator.mul, ast.Div: operator.truediv}
+_CALLS = {"radians": np.radians, "degrees": np.degrees}
+
+
+def _eval_const(node: ast.AST, env: dict) -> float:
+    """Evaluate the small arithmetic main.py uses for its constants
+    (numbers, + - * /, unary minus, np.radians/np.degrees, earlier names)
+    without importing main.py - importing it opens the camera and the I2C bus."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return float(node.value)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        return -_eval_const(node.operand, env)
+    if isinstance(node, ast.BinOp) and type(node.op) in _BINOPS:
+        return _BINOPS[type(node.op)](_eval_const(node.left, env), _eval_const(node.right, env))
+    if isinstance(node, ast.Call) and len(node.args) == 1:
+        fn = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
+        if fn in _CALLS:
+            return float(_CALLS[fn](_eval_const(node.args[0], env)))
+    if isinstance(node, ast.Name) and node.id in env:
+        return env[node.id]
+    raise ValueError("not a simple constant")
+
+
+def load_main_params(path: Path = MAIN_PY) -> tuple[dict, list[str]]:
+    """Read the geometry/servo constants out of main.py. Returns the values
+    and the names that had to fall back to FALLBACK_MAIN."""
+    found: dict = {}
+    try:
+        tree = ast.parse(path.read_text())
+    except (OSError, SyntaxError):
+        tree = ast.Module(body=[], type_ignores=[])
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for t in targets:
+                if isinstance(t, ast.Name):
+                    try:
+                        found[t.id] = _eval_const(node.value, found)
+                    except ValueError:
+                        pass
+        # mm_per_px is a keyword argument of Calibration(...), not a variable.
+        if isinstance(node, ast.keyword) and node.arg == "mm_per_px":
+            try:
+                found["mm_per_px"] = _eval_const(node.value, found)
+            except ValueError:
+                pass
+    out = {k: found.get(k, v) for k, v in FALLBACK_MAIN.items()}
+    missing = [k for k in FALLBACK_MAIN if k not in found]
+    return out, missing
+
+
+MAIN, MAIN_MISSING = load_main_params()
 
 # Regulation table-tennis ball (ITTF spec): 40mm diameter. Coverage is
 # checked against plate_diameter + this, not the bare plate - the camera
@@ -112,7 +178,11 @@ from utils import PlateOrientation
 # distortion near the frame border.
 BALL_DIAMETER_MM = 40.0
 
-AZIMUTHS_DEG = (0.0, 120.0, 240.0)  # arm layout; matches THETAS in tests
+# Physical arms in main.py's order (bras_1/2/3), each with its own mount
+# azimuth and calibrated neutral (OFFSET_ARM_*, raw servo frame).
+ARM_NAMES = ("bras_1", "bras_2", "bras_3")
+AZIMUTHS_DEG = tuple(float(np.degrees(MAIN[f"MOUNT_ANGLE_ARM_{i}"])) % 360.0 for i in (1, 2, 3))
+ARM_OFFSETS_RAD = np.array([MAIN[f"OFFSET_ARM_{i}"] for i in (1, 2, 3)])
 
 # Pi Camera Module 3 published lens FOV (Raspberry Pi datasheet). "Windowed"
 # capture modes (e.g. main.py's 640x480 preview) can crop the sensor and see
@@ -128,21 +198,22 @@ DEFAULT_CAMERA_PRESET = "Wide (Cam3 Wide)"  # Standard's FOV cannot cover a
 # enclosure - Wide is the realistic starting point.
 
 DEFAULTS = dict(
-    L=140.0, L1=100.0, L2=130.0, L3=90.0, h=150.0,
-    theta_deg=8.0, phi_deg=0.0, bearing_offset_deg=45.0,
-    plate_diameter=280.0,
+    L=MAIN["L"], L1=MAIN["L1"], L2=MAIN["L2"], L3=MAIN["L3"], h=MAIN["h"],
+    theta_deg=MAIN["MAX_TILT_DEG"], phi_deg=0.0, max_tilt_deg=MAIN["MAX_TILT_DEG"],
+    # Shift added on top of every arm's calibrated OFFSET_ARM_* - 0 = main.py.
+    bearing_offset_deg=0.0,
+    # The plate joints sit at radius L, so the plate is at least 2L across.
+    plate_diameter=2.0 * MAIN["L"],
 )
 
 # The camera is embedded right at the base/motor plane (origin of the rig's
 # frame), looking straight up - so camera_z = 0 and h (plate height) IS the
 # camera-to-plate distance directly, no separate offset to account for.
-#
-# NOTE: at this h/plate_diameter, coverage is NOT sufficient (~198.6mm
-# visible vertically vs. 320mm needed for the full plate+ball) - confirmed
-# and accepted deliberately in favor of the larger 280mm plate. Reduce L
-# toward ~65-70mm (diameter ~130-140mm) if full-plate camera coverage is
-# ever needed instead.
 DEFAULTS["camera_z"] = 0.0
+
+# Phi resolution of the "any direction at max tilt" check - the controller
+# can ask for max_tilt in any direction, so that's what has to be reachable.
+WORST_CASE_PHI_STEP_DEG = 5.0
 
 SLIDER_SPECS = [
     # (key, label, min, max)
@@ -153,10 +224,23 @@ SLIDER_SPECS = [
     ("h", "h  plate neutral height (mm)", 10.0, 200.0),
     ("theta_deg", "theta  tilt magnitude (deg)", -30.0, 30.0),
     ("phi_deg", "phi  tilt direction (deg)", 0.0, 360.0),
-    ("bearing_offset_deg", "bearing neutral offset (deg)", -90.0, 90.0),
+    ("max_tilt_deg", "max tilt (MAX_TILT_DEG, deg)", 1.0, 45.0),
+    ("bearing_offset_deg", "shift on OFFSET_ARM_* (deg)", -90.0, 90.0),
     ("plate_diameter", "physical plate diameter (mm)", 60.0, 500.0),
     ("camera_z", "camera mount height (mm, below plate = negative)", -300.0, 150.0),
 ]
+
+
+def _phi_ranges(phis: np.ndarray) -> str:
+    """[0, 5, 10, 90, 95] -> '0-10, 90-95' (deg)."""
+    groups, start, prev = [], phis[0], phis[0]
+    for ph in phis[1:]:
+        if ph - prev > WORST_CASE_PHI_STEP_DEG + 1e-9:
+            groups.append((start, prev))
+            start = ph
+        prev = ph
+    groups.append((start, prev))
+    return ", ".join(f"{a:.0f}" if a == b else f"{a:.0f}-{b:.0f}" for a, b in groups)
 
 
 def build_arms(L1: float, L2: float, L3: float) -> np.ndarray:
@@ -190,14 +274,38 @@ class State:
             self.bp_tilt = solve_bearing_positions(PlateOrientation(n=n_tilt, h=h), arms, self.ee_tilt, L)
             self.q_tilt = solve_servo_angles(arms, self.bp_tilt)
 
-        bearing_offset = np.radians(p["bearing_offset_deg"])
+        self.offsets = ARM_OFFSETS_RAD + np.radians(p["bearing_offset_deg"])
         delta = self.q_tilt - self.q_flat
-        raw_command = bearing_offset + delta  # rad; mirrors Actuation's differential frame
+        raw_command = self.offsets + delta  # rad; mirrors Actuation's differential frame
         self.raw_command = raw_command
         self.raw_clipped = np.clip(raw_command, 0.0, np.pi)
         self.saturated = ~np.isclose(raw_command, self.raw_clipped)
         self.reachable = np.isfinite(self.q_flat) & np.isfinite(self.q_tilt)
         self.margin_deg = np.degrees(np.minimum(self.raw_clipped, np.pi - self.raw_clipped))
+
+        # --- worst case: max_tilt in EVERY direction (what the controller can ask) ---
+        self.max_tilt_deg = p["max_tilt_deg"]
+        phis = np.arange(0.0, 360.0, WORST_CASE_PHI_STEP_DEG)
+        raw_all = np.array([self.raw_at(self.max_tilt_deg, ph) for ph in phis])  # (n_phi, 3) deg
+        bad_reach = ~np.isfinite(raw_all)
+        bad_stop = np.isfinite(raw_all) & ((raw_all < 0.0) | (raw_all > 180.0))
+        self.worst_unreachable_phis = phis[bad_reach.any(axis=1)]
+        self.worst_stop_phis = phis[bad_stop.any(axis=1)]
+        with np.errstate(invalid="ignore"):
+            self.worst_margin_deg = float(np.nanmin(np.minimum(raw_all, 180.0 - raw_all))) \
+                if np.isfinite(raw_all).any() else float("nan")
+        self.worst_delta_deg = float(np.nanmax(np.abs(raw_all - np.degrees(self.offsets)))) \
+            if np.isfinite(raw_all).any() else float("nan")
+        # Largest tilt reachable in every direction (bisection on theta).
+        lo, hi = 0.0, 80.0
+        for _ in range(12):
+            mid = 0.5 * (lo + hi)
+            r = np.array([self.raw_at(mid, ph) for ph in phis[::3]])
+            if np.all(np.isfinite(r)) and np.all((r >= 0.0) & (r <= 180.0)):
+                lo = mid
+            else:
+                hi = mid
+        self.max_safe_tilt_deg = lo
 
         # --- camera coverage ---
         fov_h, fov_v, fov_diag = p["fov"]
@@ -218,9 +326,17 @@ class State:
         self.required_span = p["plate_diameter"] + BALL_DIAMETER_MM
         self.coverage_margin = binding - self.required_span
         self.coverage_ok = self.coverage_margin > 0
+        # What main.py's (uncalibrated) mm_per_px claims the frame covers.
+        self.main_frame_mm = (CAMERA_RES[0] * MAIN["mm_per_px"], CAMERA_RES[1] * MAIN["mm_per_px"])
 
         # --- single go/no-go verdict for this configuration ---
         reasons = []
+        if len(self.worst_unreachable_phis):
+            reasons.append(f"max tilt {self.max_tilt_deg:.1f} deg unreachable toward phi "
+                           f"{_phi_ranges(self.worst_unreachable_phis)}")
+        if len(self.worst_stop_phis):
+            reasons.append(f"max tilt {self.max_tilt_deg:.1f} deg hits a servo stop toward phi "
+                           f"{_phi_ranges(self.worst_stop_phis)}")
         if not np.all(self.reachable):
             bad = [i + 1 for i in range(3) if not self.reachable[i]]
             reasons.append(f"arm{bad} unreachable (IK has no solution)")
@@ -233,25 +349,24 @@ class State:
         self.reasons = reasons
         self.ok = len(reasons) == 0
 
-    def bearing_sweep(self, phi_deg: float, n: int = 61):
-        """raw_command (deg) for all 3 arms across theta in [0, 30 deg] at a
-        fixed tilt direction - the "run out of servo before run out of
-        tilt?" curve."""
-        L, h = self.p["L"], self.p["h"]
-        arms = self.arms
-        phi = np.radians(phi_deg)
-        bearing_offset = np.radians(self.p["bearing_offset_deg"])
-        thetas_deg = np.linspace(0.0, 30.0, n)
-        out = np.empty((n, len(arms)))
+    def raw_at(self, theta_deg: float, phi_deg: float) -> np.ndarray:
+        """raw servo command (deg) for all 3 arms at one tilt - NaN where IK
+        has no solution."""
+        theta, phi = np.radians(theta_deg), np.radians(phi_deg)
+        n_tilt = (np.sin(theta) * np.cos(phi), np.sin(theta) * np.sin(phi), np.cos(theta))
+        orient = PlateOrientation(n=n_tilt, h=self.p["h"])
         with np.errstate(all="ignore"):
-            for i, td in enumerate(thetas_deg):
-                theta = np.radians(td)
-                n_tilt = (np.sin(theta) * np.cos(phi), np.sin(theta) * np.sin(phi), np.cos(theta))
-                orient = PlateOrientation(n=n_tilt, h=h)
-                ee = solve_end_effector_positions(orient, arms, L)
-                bp = solve_bearing_positions(orient, arms, ee, L)
-                q = solve_servo_angles(arms, bp)
-                out[i] = np.degrees(bearing_offset + (q - self.q_flat))
+            ee = solve_end_effector_positions(orient, self.arms, self.p["L"])
+            bp = solve_bearing_positions(orient, self.arms, ee, self.p["L"])
+            q = solve_servo_angles(self.arms, bp)
+        return np.degrees(self.offsets + (q - self.q_flat))
+
+    def bearing_sweep(self, phi_deg: float, n: int = 61):
+        """raw_command (deg) for all 3 arms across theta in [0, 30 deg] (or
+        further, if max_tilt is set beyond that) at a fixed tilt direction -
+        the "run out of servo before run out of tilt?" curve."""
+        thetas_deg = np.linspace(0.0, max(30.0, self.max_tilt_deg * 1.25), n)
+        out = np.array([self.raw_at(td, phi_deg) for td in thetas_deg])
         return thetas_deg, out
 
 
@@ -272,8 +387,8 @@ def main() -> None:
     marker_text = text_ax.text(0.5, 0.90, "", ha="center", va="center",
                                 fontsize=24, fontweight="bold",
                                 transform=text_ax.transAxes)
-    detail_text = text_ax.text(0.03, 0.68, "", va="top", ha="left",
-                                family="monospace", fontsize=9.5,
+    detail_text = text_ax.text(0.03, 0.80, "", va="top", ha="left",
+                                family="monospace", fontsize=8,
                                 transform=text_ax.transAxes)
 
     params = dict(DEFAULTS)
@@ -318,7 +433,7 @@ def main() -> None:
 
     def draw_arm_panel(states: dict[str, State]):
         ax_arm.clear()
-        ax_arm.set_title("Arm 1 (azimuth 0 deg): motor -> elbow -> joint")
+        ax_arm.set_title(f"{ARM_NAMES[0]} (azimuth {AZIMUTHS_DEG[0]:.0f} deg): motor -> elbow -> joint")
         ax_arm.set_xlabel("radial distance from center (mm)")
         ax_arm.set_ylabel("height (mm)")
         ax_arm.set_aspect("equal")
@@ -425,8 +540,10 @@ def main() -> None:
             for arm_i in range(sweep_deg.shape[1]):
                 ax_sweep.plot(thetas_deg, sweep_deg[:, arm_i], color=style["color"],
                               ls=style["ls"], lw=1.5 if arm_i == 0 else 0.8,
-                              label=(f"{tag} arm{arm_i+1}" if arm_i == 0 else None))
+                              label=(f"{tag} {ARM_NAMES[arm_i]}" if arm_i == 0 else None))
         ax_sweep.axvline(st_cur_theta[0], color="black", lw=0.8, ls=":")
+        max_tilt = states["cur"].max_tilt_deg
+        ax_sweep.axvline(max_tilt, color="tab:red", lw=1.2, ls="--", label=f"max tilt {max_tilt:.0f} deg")
         ax_sweep.set_ylim(-10, 190)
         ax_sweep.legend(loc="upper right", fontsize=7)
         ax_sweep.grid(alpha=0.3)
@@ -438,12 +555,22 @@ def main() -> None:
         return "GEOMETRY NOT OK", "tab:red"
 
     def format_details(st: State) -> str:
+        offs = "  ".join(f"{np.degrees(o):.1f}" for o in st.offsets)
         lines = [
-            f"min bearing margin to stop:      {np.min(st.margin_deg):5.1f} deg",
+            f"servo neutrals (deg, arm1-3):    {offs}",
+            f"min bearing margin to stop:      {np.min(st.margin_deg):5.1f} deg  (this tilt)",
+            f"at max tilt {st.max_tilt_deg:4.1f}, any direction:",
+            f"  worst margin to stop:          {st.worst_margin_deg:5.1f} deg",
+            f"  biggest servo move:            {st.worst_delta_deg:5.1f} deg",
+            f"largest tilt OK in every dir:    {st.max_safe_tilt_deg:5.1f} deg",
             f"camera coverage margin:          {st.coverage_margin:+6.1f} mm",
             f"  (needs plate {st.p['plate_diameter']:.0f} + ball {BALL_DIAMETER_MM:.0f} "
             f"= {st.required_span:.0f} mm)",
+            f"mm_per_px: lens {st.mm_per_px_h:.2f}  vs main.py {MAIN['mm_per_px']:.2f}",
+            f"  main.py's value => frame only {st.main_frame_mm[0]:.0f} x {st.main_frame_mm[1]:.0f} mm",
         ]
+        if MAIN_MISSING:
+            lines.append(f"(not found in main.py, using fallback: {', '.join(MAIN_MISSING)})")
         if st.reasons:
             lines.append("")
             lines.append("why not:")

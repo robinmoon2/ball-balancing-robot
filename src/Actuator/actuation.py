@@ -178,11 +178,26 @@ class Actuation:
             )
         self._reachable = bool(np.all(np.isfinite(target)))
         if not self._reachable:
+            # Don't freeze: tilt as far as the arms can in the requested
+            # direction. Bisect on the fraction of the command, since
+            # reachability is monotonic in tilt magnitude along a ray.
+            lo, hi = 0.0, 1.0
+            for _ in range(12):
+                mid = 0.5 * (lo + hi)
+                trial = self.solve(
+                    PlateCommand(roll=command.roll * mid, pitch=command.pitch * mid), height
+                )
+                if np.all(np.isfinite(trial)):
+                    lo, target = mid, trial
+                else:
+                    hi = mid
+            if not np.all(np.isfinite(target)):
+                logger.warning("unreachable pose even when flat; holding last angles")
+                return self.last_angles
             logger.warning(
-                "unreachable pose (roll=%.3f, pitch=%.3f rad); holding last angles",
-                command.roll, command.pitch,
+                "unreachable pose (roll=%.3f, pitch=%.3f rad); scaled to %.0f%%",
+                command.roll, command.pitch, 100 * lo,
             )
-            return self.last_angles
 
         if self.max_rate_rad_s is not None:
             max_step = self.max_rate_rad_s * dt

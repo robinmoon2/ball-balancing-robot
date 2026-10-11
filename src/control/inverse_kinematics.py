@@ -51,9 +51,13 @@ def normal_vector_board(pitch: float, roll: float, height: float) -> PlateOrient
     Pitch and roll are in radians, with the plate's local axes aligned with
     the global axes when both are zero. The plate's center is at (0, 0, h).
     """
-    alpha = np.sin(roll)
+    # Composed rotation (roll then pitch) applied to +z. Always unit length,
+    # so gamma can't go NaN at large tilts the way sqrt(1 - sin²r - sin²p)
+    # did (that fails as soon as sin²(roll) + sin²(pitch) > 1). Identical
+    # to the old form to first order, so sign conventions are unchanged.
+    alpha = np.sin(roll) * np.cos(pitch)
     beta = -np.sin(pitch)
-    gamma = np.sqrt(1 - alpha**2 - beta**2)  # positive z-axis
+    gamma = np.cos(roll) * np.cos(pitch)  # positive z-axis
     return PlateOrientation(n=(alpha, beta, gamma), h=height)
 
 def solve_end_effector_positions(

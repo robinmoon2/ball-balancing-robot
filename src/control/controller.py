@@ -58,9 +58,14 @@ class Controller:
         pitch = -self.pid_x.update(ex, state.vx, dt)
         roll = self.pid_y.update(ey, state.vy, dt)
 
-        # Hard clamp for safety
-        pitch = max(-self.max_tilt, min(self.max_tilt, pitch))
-        roll = max(-self.max_tilt, min(self.max_tilt, roll))
+        # Hard clamp for safety, on the tilt MAGNITUDE: clamping each axis
+        # separately lets a diagonal command reach sqrt(2) * max_tilt,
+        # which is where the IK runs out of reach first.
+        tilt = math.hypot(roll, pitch)
+        if tilt > self.max_tilt:
+            scale = self.max_tilt / tilt
+            roll *= scale
+            pitch *= scale
 
         self._last_command = PlateCommand(roll=roll, pitch=pitch)
         return self._last_command

@@ -51,14 +51,19 @@ warmup_ticks: int = 5
 max_timeout_seconds = 0.25
 
 #Variables for control
-G_EFF = 6000.0          # mm/s² per rad (hollow ball; ~7000 if solid)
+G_EFF = 7000.0          # mm/s² per rad (hollow ball; ~7000 if solid)
 WN, ZETA = 4.0, 0.8
 KP = WN**2 / G_EFF               # ≈ 0.0027 rad/mm
 KD = 2 * ZETA * WN / G_EFF       # ≈ 0.0011 rad/(mm/s)
-PID_X = PID(kp=KP, ki=0.0, kd=KD)
-PID_X = PID(kp=0.0027,ki=0.0,kd=0.0011)
-PID_Y = PID(kp=0.0027,ki=0.0,kd=0.0011)
-max_tilt_rad = np.radians(8)
+
+#PID_X = PID(kp=KP, ki=0.0, kd=KD)
+#PID_Y = PID(kp=KP, ki=0.0, kd=KD)
+PID_X = PID(kp=0.0012,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))
+PID_Y = PID(kp=0.0012,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))
+# Plate tilt limit, in DEGREES (np.radians converts). np.radians(2) is only
+# 2 deg = 0.035 rad. This geometry reaches ~25 deg in any direction.
+MAX_TILT_DEG = 20.0
+max_tilt_rad = np.radians(MAX_TILT_DEG)
 
 # Variables for arms
 
@@ -67,11 +72,11 @@ L1 = 140.0  # distal link: elbow -> spherical joint (mm)
 L2 = 120.0  # proximal link: motor axis -> elbow (mm)
 L3 = 90.0  # base radius: center -> motor axis (mm)
 
-h = 180.0  # global: starting/center plate height (mm) - plate begins here
+h = 150.0  # global: starting/center plate height (mm) - plate begins here
 
-OFFSET_ARM_1 = 0.5 # rad, from calibration_servo.py
-OFFSET_ARM_2 = 0.4
-OFFSET_ARM_3 = 0.4
+OFFSET_ARM_1 = 0.5 + 0.4 # rad, from calibration_servo.py
+OFFSET_ARM_2 = 0.4 + 0.45
+OFFSET_ARM_3 = 0.4 + 0.45
 
 # Physical mount azimuth of each named arm (bras_1/2/3, matching
 # calibration_servo.py) - NOT in numeric order: arm 2 sits at 0 deg,
