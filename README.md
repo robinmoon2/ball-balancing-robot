@@ -14,8 +14,8 @@ This project is written on python using the uv environnment the overall running 
 
 - **/tool** : a folder with hte geometric explorer that allow us to make the geomatry varies and gives us different graph for it to figure out how can we improve the structure and with the values.
 
-[!WARNING]
-This is only a geometric function, no link with the choose of the material for the parts
+>[!WARNING]
+>This is only a geometric function, no link with the choose of the material for the parts
 
 ## Hardware
 
