@@ -47,7 +47,7 @@ from control.inverse_kinematics import (
 )
 # Rig geometry and arm construction are shared with the vertical test so
 # there is one source of truth for the measured lengths.
-from control.test_vertical_motion import L, angles_out_of_range, build_arms
+from src.control.control_test.test_vertical_motion import L, angles_out_of_range, build_arms
 
 ### CONFIG ###
 H_CIRCLE = 170.0  # mm, plate centre height held constant through the circle.
