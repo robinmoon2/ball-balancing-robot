@@ -23,4 +23,5 @@ This is only a geometric function, no link with the choose of the material for t
 
 The computer inside is a raspberry 4. Connected to it we have a raspberry pi camera that is turning up to see the ball in movement. Then we have the PCA9685 that is link using I2C to the raspberry pi and help us drive the servo motors with more power and better stability. For the servo motors, there is 3 of MZ996 from Miuzei, 180 degrees metal.
 
-[!NOTE] Some people will think that the servos are too much for the project. The goal was to build the kinematic part knowing that the hardware will be not a limited factor for the project
+>[!NOTE] 
+>Some people will think that the servos are too much for the project. The goal was to build the kinematic part knowing that the hardware will be not a limited factor for the project
