@@ -1,4 +1,6 @@
-from src.control.controller import Controller
+import os
+
+from src.control.controller_pid import Controller
 from src.control.arm import Arm
 
 from src.estimation.estimation import Estimation
@@ -23,67 +25,23 @@ LOG_PATH = f"tuning_log_{now}.csv"
 
 def build_arms(pca) -> np.ndarray:
     arm_1 = Arm(
-        servo=Servo(pca, channel=0, name="bras_1", reverse=True, offset_rad=OFFSET_ARM_1),
-        L1=L1, L2=L2, L3=L3, mount_angle_rad=MOUNT_ANGLE_ARM_1,
+        servo=Servo(pca, channel=0, name="bras_1", reverse=True, offset_rad=float(os.getenv("OFFSET_ARM_1"))),
+        L1=float(os.getenv("L1")), L2=float(os.getenv("L2")), L3=float(os.getenv("L3")), mount_angle_rad=float(os.getenv("MOUNT_ANGLE_ARM_1")),
     )
     arm_2 = Arm(
-        servo=Servo(pca, channel=1, name="bras_2", reverse=True, offset_rad=OFFSET_ARM_2),
-        L1=L1, L2=L2, L3=L3, mount_angle_rad=MOUNT_ANGLE_ARM_2,
+        servo=Servo(pca, channel=1, name="bras_2", reverse=True, offset_rad=float(os.getenv("OFFSET_ARM_2"))),
+        L1=float(os.getenv("L1")), L2=float(os.getenv("L2")), L3=float(os.getenv("L3")), mount_angle_rad=float(os.getenv("MOUNT_ANGLE_ARM_2")),
     )
     arm_3 = Arm(
-        servo=Servo(pca, channel=2, name="bras_3", reverse=True, offset_rad=OFFSET_ARM_3),
-        L1=L1, L2=L2, L3=L3, mount_angle_rad=MOUNT_ANGLE_ARM_3,
+        servo=Servo(pca, channel=2, name="bras_3", reverse=True, offset_rad=float(os.getenv("OFFSET_ARM_3"))),
+        L1=float(os.getenv("L1")), L2=float(os.getenv("L2")), L3=float(os.getenv("L3")), mount_angle_rad=float(os.getenv("MOUNT_ANGLE_ARM_3")),
     )
     return np.array([arm_1, arm_2, arm_3])
-
-# Variables for perception
-camera_source: int = 0
-camera_height: int = 480  # must be a multiple of 16 (I420 plane alignment)
-camera_width: int = 640  # must be a multiple of 32
-camera_framerate: int = 30
-detection_min_area: int = 200
-score_threshold: int = 0.15
-
-# Variables for estimation
-process_noise_std: float = 1500.0
-measurement_noise_std: float = 1.5
-warmup_ticks: int = 5
-max_timeout_seconds = 0.25
-
-#Variables for control
-G_EFF = 7000.0          # mm/s² per rad (hollow ball; ~7000 if solid)
-WN, ZETA = 4.0, 0.8
-KP = WN**2 / G_EFF               # ≈ 0.0027 rad/mm
-KD = 2 * ZETA * WN / G_EFF       # ≈ 0.0011 rad/(mm/s)
 
 #PID_X = PID(kp=KP, ki=0.0, kd=KD)
 #PID_Y = PID(kp=KP, ki=0.0, kd=KD)
 PID_X = PID(kp=0.0012,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))
 PID_Y = PID(kp=0.0012,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))
-# Plate tilt limit, in DEGREES (np.radians converts). np.radians(2) is only
-# 2 deg = 0.035 rad. This geometry reaches ~25 deg in any direction.
-MAX_TILT_DEG = 20.0
-max_tilt_rad = np.radians(MAX_TILT_DEG)
-
-# Variables for arms
-
-L = 150.0  # plate half-width: center -> spherical joint (mm)
-L1 = 140.0  # distal link: elbow -> spherical joint (mm)
-L2 = 120.0  # proximal link: motor axis -> elbow (mm)
-L3 = 90.0  # base radius: center -> motor axis (mm)
-
-h = 150.0  # global: starting/center plate height (mm) - plate begins here
-
-OFFSET_ARM_1 = 0.5 + 0.4 # rad, from calibration_servo.py
-OFFSET_ARM_2 = 0.4 + 0.45
-OFFSET_ARM_3 = 0.4 + 0.45
-
-# Physical mount azimuth of each named arm (bras_1/2/3, matching
-# calibration_servo.py) - NOT in numeric order: arm 2 sits at 0 deg,
-# arm 3 at 120 deg, arm 1 at 240 deg.
-MOUNT_ANGLE_ARM_1 = np.radians(240.0)
-MOUNT_ANGLE_ARM_2 = np.radians(0.0)
-MOUNT_ANGLE_ARM_3 = np.radians(120.0)
 
 pca = create_pca()
 arms: np.ndarray = build_arms(pca)
@@ -98,17 +56,17 @@ arms: np.ndarray = build_arms(pca)
 # mm_per_px only sets the loop gain now; measure it properly with
 # `python -m src.perception.calibrate` when you want the gains to be in
 # real units.
-perception = Perception(calibration=Calibration(origin_px=(camera_width / 2, camera_height / 2),
+perception = Perception(calibration=Calibration(origin_px=(int(os.getenv("camera_width")) // 2, int(os.getenv("camera_height")) // 2),
                                                 mm_per_px=0.14),
-                        camera=Camera(source=camera_source,width=camera_width,height=camera_height,
-                                      framerate=camera_framerate),
-                        detector=OrangeDetector(min_area=detection_min_area,score_threshold=score_threshold)
+                        camera=Camera(source=int(os.getenv("camera_source")),width=int(os.getenv("camera_width")),height=int(os.getenv("camera_height")),
+                                      framerate=int(os.getenv("camera_framerate"))),
+                        detector=OrangeDetector(min_area=int(os.getenv("detection_min_area")),score_threshold=float(os.getenv("score_threshold")))
                         )
 
-estimation = Estimation(process_noise_std=process_noise_std,measurement_noise_std=measurement_noise_std, warmup_ticks=warmup_ticks,max_dropout_seconds=max_timeout_seconds)
-controller = Controller(pid_x=PID_X, pid_y=PID_Y,max_tilt_rad=max_tilt_rad)
+estimation = Estimation(process_noise_std=float(os.getenv("process_noise_std")),measurement_noise_std=float(os.getenv("measurement_noise_std")), warmup_ticks=int(os.getenv("warmup_ticks")),max_dropout_seconds=float(os.getenv("max_timeout_seconds")))
+controller = Controller(pid_x=PID_X, pid_y=PID_Y,max_tilt_rad=float(os.getenv("max_tilt_rad")))
 controller.set_target(0.0, 0.0)
-actuator = Actuation(arms=arms, plate_radius=L, neutral_height=h, max_rate_rad_s=5.0)
+actuator = Actuation(arms=arms, plate_radius=float(os.getenv("L")), neutral_height=float(os.getenv("h")), max_rate_rad_s=5.0)
 
 print("INITIALISATION COMPLETE: starting main loop. Press Ctrl+C to stop and write log.")
 
@@ -118,8 +76,8 @@ log.writerow(["dt","dt_detection","dt_estimation","dt_control","dt_actuation",
               "valid","x_mm","y_mm","vx","vy","roll","pitch"]) #dt is the global time between each loop
 
 # Centre of the camera frame - the target the ball is driven towards.
-FRAME_CX = camera_width / 2.0
-FRAME_CY = camera_height / 2.0
+FRAME_CX = int(os.getenv("camera_width")) / 2.0
+FRAME_CY = int(os.getenv("camera_height")) / 2.0
 PRINT_EVERY_S = 0.2  # console is rate-limited; the CSV gets every tick
 
 
