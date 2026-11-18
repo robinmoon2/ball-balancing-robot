@@ -38,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 
-from src.control import test_vertical_motion as tvm
+from src.control.control_test import test_vertical_motion as tvm
 
 
 def check_angles_in_range(height: float) -> list[str]:

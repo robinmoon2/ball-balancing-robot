@@ -28,7 +28,7 @@ import logging
 import numpy as np
 
 from src.control.arm import Arm
-from src.control.controller import PlateCommand
+from src.control.controller_pid import PlateCommand
 from src.control.inverse_kinematics import incline_board
 
 logger = logging.getLogger(__name__)

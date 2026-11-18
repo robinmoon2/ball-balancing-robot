@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 import math
 
-from .pid import PID
-from utils import BallEstimate, PlateCommand
+from src.utils import PID
+from src.utils import BallEstimate, PlateCommand
 
 logger = logging.getLogger(__name__)
 
