@@ -76,10 +76,23 @@ class PlateCommand:
     roll: float  # rad, rotation about plate X axis
     pitch: float  # rad, rotation about plate Y axis
 
+@dataclass
+class StateSpaceModel:
+    k: float  # roll of the ball coefficient 
+    g: float = 9.81  # gravity acceleration in m/s^2
+    A: np.ndarray = np.array([[0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0]])  # State transition matrix 4*4
+    B: np.ndarray = np.array([[0, 0], [0, 0], [k * g, 0], [0, k * g]])  # Control input matrix 4*2
+    C: np.ndarray = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])  # Output matrix 2*4
+    D: np.ndarray = np.array([[0, 0, 0, 0], [0, 0, 0, 0]])  # Feedthrough matrix 2*4
+    
+@dataclass
+class State: # often from the estimation of the kalman filter
+    x: float
+    y: float
+    vx: float
+    vy: float
 
 # --- from control/inverse_kinematics.py -------------------------------------
-
-
 @dataclass
 class PlateOrientation:
     n: tuple[float, float, float]  # (alpha, beta, gamma), need not be unit
@@ -175,3 +188,4 @@ class SimState:
     roll: float = 0.0  # actual plate roll (after lag)
     pitch: float = 0.0  # actual plate pitch (after lag)
     on_plate: bool = True
+
