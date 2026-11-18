@@ -91,6 +91,24 @@ class State: # often from the estimation of the kalman filter
     y: float
     vx: float
     vy: float
+    
+    def dot(self, matrix: np.ndarray) -> "State":
+        state_vector = np.array([self.x, self.y, self.vx, self.vy])
+        result = np.asarray(matrix) @ state_vector
+
+        if result.shape != (4,):
+            raise ValueError(
+                f"Expected a 4x4 matrix producing 4 values, got shape {result.shape}"
+            )
+
+        return State(
+            x=float(result[0]),
+            y=float(result[1]),
+            vx=float(result[2]),
+            vy=float(result[3]),
+        )
+        
+
 
 # --- from control/inverse_kinematics.py -------------------------------------
 @dataclass
