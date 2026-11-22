@@ -38,7 +38,7 @@ import time
 
 import numpy as np
 
-from Actuator.Servo import create_pca
+from actuator.Servo import create_pca
 from control.inverse_kinematics import (
     PlateOrientation,
     solve_bearing_positions,

@@ -27,8 +27,8 @@ Geometry model:
 from __future__ import annotations
 import numpy as np
 
-from control.arm import Arm
-from utils import PlateOrientation, VectorPosition
+from src.control.arm import Arm
+from src.utils import PlateOrientation, VectorPosition
 
 
 def incline_board(pitch, roll, height, arms, L):

@@ -4,7 +4,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from utils import Detection
+from src.utils import Detection
 
 
 class OrangeDetector:

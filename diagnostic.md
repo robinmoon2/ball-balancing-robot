@@ -119,7 +119,7 @@ Alternatively, set `derivative_filter=0.5–0.7`, which is simpler but adds lag.
 Gain: −23 ms per frame. It also frees enough CPU budget for 60–120 FPS (see P2-8).
 
 ### P1-5 — Software slew limit throttles the servos 🟠
-`src/Actuator/actuation.py:60` sets `max_rate_rad_s=2.0`, and `main.py:107` keeps the default. That is about 115 °/s. Typical hobby servos (MG996R/DS3218) do about 300–500 °/s. The software is making the servos 3–4× slower than they can physically move.
+`src/actuator/actuation.py:60` sets `max_rate_rad_s=2.0`, and `main.py:107` keeps the default. That is about 115 °/s. Typical hobby servos (MG996R/DS3218) do about 300–500 °/s. The software is making the servos 3–4× slower than they can physically move.
 
 **Fix:** try `Actuation(..., max_rate_rad_s=5.0)` or `None`. The tilt clamp in the controller still protects the mechanics.
 
@@ -146,7 +146,7 @@ Brighter lighting on the plate lets you use a short shutter without noise.
 The sensor offers `1536x864 @ 120 fps`. Once detection is fast (P1-4), use `camera_framerate = 60` (or 90/120) with 640×480. Each step cuts exposure and pipeline delay and gives the Kalman filter more data. Lock a short shutter first (P1-6); at 120 FPS the maximum exposure is 8 ms.
 
 ### P2-9 — Console prints in the hot path 🟡
-`src/Actuator/actuation.py:221-224` prints 3 lines on **every** tick (~90 lines/s). Over SSH or a slow terminal, `print` can block for milliseconds. `actuation.py:173` also builds a `logger.info(f"...")` string every tick, even when logging is off.
+`src/actuator/actuation.py:221-224` prints 3 lines on **every** tick (~90 lines/s). Over SSH or a slow terminal, `print` can block for milliseconds. `actuation.py:173` also builds a `logger.info(f"...")` string every tick, even when logging is off.
 
 **Fix:** delete the print (the CSV already records the deltas) and use `logger.debug("target pose: %s", target)`.
 

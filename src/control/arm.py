@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from Actuator.Servo import Servo
+from src.actuator.Servo import Servo
 
 
 class Arm:

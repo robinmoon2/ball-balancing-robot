@@ -57,12 +57,12 @@ import types
 from pathlib import Path
 
 # control/arm.py needs src/ importable as the top-level package root (it
-# does `from Actuator.Servo import Servo`, not `from src.Actuator...`).
+# does `from actuator.Servo import Servo`, not `from src.actuator...`).
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 def _stub_missing_hardware_modules() -> None:
-    """Actuator/Servo.py imports Blinka's board/busio/adafruit_pca9685 to
+    """actuator/Servo.py imports Blinka's board/busio/adafruit_pca9685 to
     talk to the real PCA9685 over I2C. This tool never touches a servo -
     arms are built with servo=None - but importing control/arm.py (needed
     to reuse the real IK code) drags Servo.py in unconditionally. On a dev

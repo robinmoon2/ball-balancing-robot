@@ -1,15 +1,17 @@
 import os
+from dotenv import load_dotenv
 
 from src.control.controller_pid import Controller
 from src.control.arm import Arm
+from src.control.LRQ_control.LQR import LQR
 
 from src.estimation.estimation import Estimation
 
 from src.perception.perception import Perception
 from src.perception.camera import Camera
 from src.perception.detector import OrangeDetector
-from src.Actuator.actuation import Actuation
-from src.Actuator.Servo import create_pca, Servo
+from src.actuator.actuation import Actuation
+from src.actuator.Servo import create_pca, Servo
 
 from src.utils import PID, Calibration
 import csv
@@ -22,6 +24,7 @@ import numpy as np
 # overshoot, oscillation period and settling time.
 now = time.strftime("%Y-%m-%d_%H-%M-%S")
 LOG_PATH = f"tuning_log_{now}.csv"
+load_dotenv()
 
 def build_arms(pca) -> np.ndarray:
     arm_1 = Arm(
@@ -38,10 +41,12 @@ def build_arms(pca) -> np.ndarray:
     )
     return np.array([arm_1, arm_2, arm_3])
 
-#PID_X = PID(kp=KP, ki=0.0, kd=KD)
-#PID_Y = PID(kp=KP, ki=0.0, kd=KD)
+
 PID_X = PID(kp=0.0012,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))
 PID_Y = PID(kp=0.0012,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))
+
+# StateSpace model
+model = StateSpaceModel(k=1.0, g=9.81)
 
 pca = create_pca()
 arms: np.ndarray = build_arms(pca)
@@ -56,15 +61,22 @@ arms: np.ndarray = build_arms(pca)
 # mm_per_px only sets the loop gain now; measure it properly with
 # `python -m src.perception.calibrate` when you want the gains to be in
 # real units.
-perception = Perception(calibration=Calibration(origin_px=(int(os.getenv("camera_width")) // 2, int(os.getenv("camera_height")) // 2),
+perception = Perception(calibration=Calibration(origin_px=(int(os.getenv("CAMERA_WIDTH")) // 2, int(os.getenv("CAMERA_HEIGHT")) // 2),
                                                 mm_per_px=0.14),
-                        camera=Camera(source=int(os.getenv("camera_source")),width=int(os.getenv("camera_width")),height=int(os.getenv("camera_height")),
-                                      framerate=int(os.getenv("camera_framerate"))),
-                        detector=OrangeDetector(min_area=int(os.getenv("detection_min_area")),score_threshold=float(os.getenv("score_threshold")))
+                        camera=Camera(source=int(os.getenv("CAMERA_SOURCE")),width=int(os.getenv("CAMERA_WIDTH")),height=int(os.getenv("CAMERA_HEIGHT")),
+                                      framerate=int(os.getenv("CAMERA_FRAMERATE"))),
+                        detector=OrangeDetector(min_area=int(os.getenv("DETECTION_MIN_AREA")),score_threshold=float(os.getenv("SCORE_THRESHOLD")))
                         )
 
-estimation = Estimation(process_noise_std=float(os.getenv("process_noise_std")),measurement_noise_std=float(os.getenv("measurement_noise_std")), warmup_ticks=int(os.getenv("warmup_ticks")),max_dropout_seconds=float(os.getenv("max_timeout_seconds")))
-controller = Controller(pid_x=PID_X, pid_y=PID_Y,max_tilt_rad=float(os.getenv("max_tilt_rad")))
+estimation = Estimation(process_noise_std=float(os.getenv("PROCESS_NOISE_STD")),measurement_noise_std=float(os.getenv("MEASUREMENT_NOISE_STD")), warmup_ticks=int(os.getenv("WARMUP_TICKS")),max_dropout_seconds=float(os.getenv("MAX_TIMEOUT_SECONDS")))
+controller = None
+
+if os.getenv("CONTROL_MODE") == "PID":
+    controller = Controller(pid_x=PID_X, pid_y=PID_Y,max_tilt_rad=float(os.getenv("MAX_TILT_RAD")))
+elif os.getenv("CONTROL_MODE") == "LQR":
+    controller = ControllerLQR( S=model, Q=np.diag([1, 1, 1, 1]), R=np.diag([1, 1]) )
+
+
 controller.set_target(0.0, 0.0)
 actuator = Actuation(arms=arms, plate_radius=float(os.getenv("L")), neutral_height=float(os.getenv("h")), max_rate_rad_s=5.0)
 
@@ -76,8 +88,8 @@ log.writerow(["dt","dt_detection","dt_estimation","dt_control","dt_actuation",
               "valid","x_mm","y_mm","vx","vy","roll","pitch"]) #dt is the global time between each loop
 
 # Centre of the camera frame - the target the ball is driven towards.
-FRAME_CX = int(os.getenv("camera_width")) / 2.0
-FRAME_CY = int(os.getenv("camera_height")) / 2.0
+FRAME_CX = int(os.getenv("CAMERA_WIDTH")) / 2.0
+FRAME_CY = int(os.getenv("CAMERA_HEIGHT")) / 2.0
 PRINT_EVERY_S = 0.2  # console is rate-limited; the CSV gets every tick
 
 

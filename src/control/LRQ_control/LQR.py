@@ -1,10 +1,11 @@
 """
 LQR control algorithm use instead of the PID for the control of the robot. The LQR controller is a state feedback controller that minimizes a cost function to achieve optimal control performance. It is particularly useful for systems with multiple inputs and outputs, such as robotic systems, where it can provide better stability and performance compared to traditional PID controllers.
 """
+import numpy as np
 from src.utils import StateSpaceModel, State
+from scipy.linalg import solve_continuous_are
 
 class LQR:
-    
     def __init__(self, S: StateSpaceModel, Q: np.ndarray, R: np.ndarray):
         self._S = S
         self._Q = Q

@@ -78,13 +78,26 @@ class PlateCommand:
 
 @dataclass
 class StateSpaceModel:
-    k: float  # roll of the ball coefficient 
-    g: float = 9.81  # gravity acceleration in m/s^2
-    A: np.ndarray = np.array([[0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0]])  # State transition matrix 4*4
-    B: np.ndarray = np.array([[0, 0], [0, 0], [k * g, 0], [0, k * g]])  # Control input matrix 4*2
-    C: np.ndarray = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])  # Output matrix 2*4
-    D: np.ndarray = np.array([[0, 0, 0, 0], [0, 0, 0, 0]])  # Feedthrough matrix 2*4
-    
+    k: float = 1.0
+    g: float = 9.81
+    A: np.ndarray = field(default_factory=lambda: np.array([
+        [0, 0, 1, 0],
+        [0, 0, 0, 1],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+    ], dtype=float))
+    B: np.ndarray = field(default_factory=lambda: np.array([
+        [0, 0],
+        [0, 0],
+        [1.0 * 9.81, 0],
+        [0, 1.0 * 9.81],
+    ]))
+    C: np.ndarray = field(default_factory=lambda: np.array([
+        [1, 0, 0, 0],
+        [0, 1, 0, 0],
+    ], dtype=float))
+    D: np.ndarray = field(default_factory=lambda: np.zeros((2, 2)))
+
 @dataclass
 class State: # often from the estimation of the kalman filter
     x: float
