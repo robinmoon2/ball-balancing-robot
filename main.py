@@ -1,9 +1,9 @@
 import os
 from dotenv import load_dotenv
 
-from src.control.controller_pid import Controller
+from src.control.controller_pid import ControllerPID
+from src.control.controller_lqr import ControllerLQR
 from src.control.arm import Arm
-from src.control.LRQ_control.LQR import LQR
 
 from src.estimation.estimation import Estimation
 
@@ -13,9 +13,10 @@ from src.perception.detector import OrangeDetector
 from src.actuator.actuation import Actuation
 from src.actuator.Servo import create_pca, Servo
 
-from src.utils import PID, Calibration
+from src.utils import PID, Calibration, StateSpaceModel
 import csv
 import logging
+import math
 import time
 import numpy as np
 
@@ -45,9 +46,6 @@ def build_arms(pca) -> np.ndarray:
 PID_X = PID(kp=0.0012,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))
 PID_Y = PID(kp=0.0012,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))
 
-# StateSpace model
-model = StateSpaceModel(k=1.0, g=9.81)
-
 pca = create_pca()
 arms: np.ndarray = build_arms(pca)
 
@@ -69,16 +67,25 @@ perception = Perception(calibration=Calibration(origin_px=(int(os.getenv("CAMERA
                         )
 
 estimation = Estimation(process_noise_std=float(os.getenv("PROCESS_NOISE_STD")),measurement_noise_std=float(os.getenv("MEASUREMENT_NOISE_STD")), warmup_ticks=int(os.getenv("WARMUP_TICKS")),max_dropout_seconds=float(os.getenv("MAX_TIMEOUT_SECONDS")))
-controller = None
+MAX_TILT_RAD = math.radians(float(os.getenv("MAX_TILT_DEG")))
+CONTROL_MODE = os.getenv("CONTROL_MODE")
 
-if os.getenv("CONTROL_MODE") == "PID":
-    controller = Controller(pid_x=PID_X, pid_y=PID_Y,max_tilt_rad=float(os.getenv("MAX_TILT_RAD")))
-elif os.getenv("CONTROL_MODE") == "LQR":
-    controller = ControllerLQR( S=model, Q=np.diag([1, 1, 1, 1]), R=np.diag([1, 1]) )
+if CONTROL_MODE == "PID":
+    controller = ControllerPID(pid_x=PID_X, pid_y=PID_Y, max_tilt_rad=MAX_TILT_RAD)
+elif CONTROL_MODE == "LQR":
+    controller = ControllerLQR.from_bryson(
+        model=StateSpaceModel(g_eff=float(os.getenv("G_EFF"))),
+        max_pos_mm=float(os.getenv("LQR_MAX_POS_MM")),
+        max_vel_mm_s=float(os.getenv("LQR_MAX_VEL_MM_S")),
+        max_tilt_rad=MAX_TILT_RAD,
+    )
+    print(f"LQR gain K (rows: roll, pitch; cols: x, y, vx, vy):\n{controller.K}")
+else:
+    raise ValueError(f"CONTROL_MODE must be 'PID' or 'LQR', got {CONTROL_MODE!r}")
 
 
 controller.set_target(0.0, 0.0)
-actuator = Actuation(arms=arms, plate_radius=float(os.getenv("L")), neutral_height=float(os.getenv("h")), max_rate_rad_s=5.0)
+actuator = Actuation(arms=arms, plate_radius=float(os.getenv("L")), neutral_height=float(os.getenv("H")), max_rate_rad_s=5.0)
 
 print("INITIALISATION COMPLETE: starting main loop. Press Ctrl+C to stop and write log.")
 

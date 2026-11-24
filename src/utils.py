@@ -78,25 +78,41 @@ class PlateCommand:
 
 @dataclass
 class StateSpaceModel:
-    k: float = 1.0
-    g: float = 9.81
-    A: np.ndarray = field(default_factory=lambda: np.array([
-        [0, 0, 1, 0],
-        [0, 0, 0, 1],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
-    ], dtype=float))
-    B: np.ndarray = field(default_factory=lambda: np.array([
-        [0, 0],
-        [0, 0],
-        [1.0 * 9.81, 0],
-        [0, 1.0 * 9.81],
-    ]))
-    C: np.ndarray = field(default_factory=lambda: np.array([
-        [1, 0, 0, 0],
-        [0, 1, 0, 0],
-    ], dtype=float))
-    D: np.ndarray = field(default_factory=lambda: np.zeros((2, 2)))
+    """Linearized ball-on-plate model, small-angle.
+
+    State x = [x, y, vx, vy] (mm, mm/s), input u = [roll, pitch] (rad).
+    g_eff (mm/s^2 per rad) = rolling factor * g, e.g. 5/7 * 9810 ~ 7000
+    for a solid ball, 3/5 * 9810 for a thin shell (ping-pong ball).
+
+    Sign convention (same as Controller):
+      +pitch -> ball accelerates toward +x :  ax = +g_eff * pitch
+      +roll  -> ball accelerates toward -y :  ay = -g_eff * roll
+    """
+
+    g_eff: float = 7000.0
+    A: np.ndarray = field(init=False)
+    B: np.ndarray = field(init=False)
+    C: np.ndarray = field(init=False)
+    D: np.ndarray = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.A = np.array([
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+        ], dtype=float)
+        self.B = np.array([
+            [0, 0],
+            [0, 0],
+            [0, self.g_eff],
+            [-self.g_eff, 0],
+        ], dtype=float)
+        self.C = np.array([
+            [1, 0, 0, 0],
+            [0, 1, 0, 0],
+        ], dtype=float)
+        self.D = np.zeros((2, 2))
 
 @dataclass
 class State: # often from the estimation of the kalman filter
@@ -104,7 +120,11 @@ class State: # often from the estimation of the kalman filter
     y: float
     vx: float
     vy: float
-    
+
+    def flatten(self) -> np.ndarray:
+        """State as a flat (4,) array: [x, y, vx, vy]."""
+        return np.array([self.x, self.y, self.vx, self.vy], dtype=float)
+
     def dot(self, matrix: np.ndarray) -> "State":
         state_vector = np.array([self.x, self.y, self.vx, self.vy])
         result = np.asarray(matrix) @ state_vector

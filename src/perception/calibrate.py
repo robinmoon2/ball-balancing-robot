@@ -21,6 +21,11 @@ from __future__ import annotations
 
 import sys
 import time
+from pathlib import Path
+
+# Let this file be run directly (`uv run src/perception/calibrate.py`), not
+# only with `-m`: put the repo root on sys.path for the `src.` imports.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
 

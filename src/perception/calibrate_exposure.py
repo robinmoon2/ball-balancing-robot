@@ -50,10 +50,14 @@ import tempfile
 import time
 from pathlib import Path
 
+# Let this file be run directly (`uv run src/perception/calibrate_exposure.py`),
+# not only with `-m`: put the repo root on sys.path for the `src.` imports.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 import numpy as np
 
-from camera import Camera
-from detector import OrangeDetector
+from src.perception.camera import Camera
+from src.perception.detector import OrangeDetector
 
 WIDTH, HEIGHT, FRAMERATE = 640, 480, 30
 OBSERVE_S = 5.0  # phase 1: how long to let the auto algorithms settle
