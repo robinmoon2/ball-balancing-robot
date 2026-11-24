@@ -16,12 +16,15 @@ Run from the repo root:
 from __future__ import annotations
 
 import time
-
+import sys
 import numpy as np
+from pathlib import Path
 
-from actuator.Servo import Servo, create_pca
-from control.arm import Arm
-from control.inverse_kinematics import (
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # repo root
+
+from src.actuator.Servo import Servo, create_pca
+from src.control.arm import Arm
+from src.control.inverse_kinematics import (
     PlateOrientation,
     solve_bearing_positions,
     solve_end_effector_positions,

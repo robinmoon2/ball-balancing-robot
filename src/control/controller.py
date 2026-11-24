@@ -22,10 +22,23 @@ logger = logging.getLogger(__name__)
 
 
 class Controller(ABC):
+    # Names of the per-tick internal terms a subclass exposes through
+    # `last_terms` (e.g. the P/I/D contributions). Fixed per class so the
+    # log can build its columns up front.
+    TERM_NAMES: tuple[str, ...] = ()
+
     def __init__(self, max_tilt_rad: float = math.radians(15)):
         self.max_tilt = max_tilt_rad
         self.target = (0.0, 0.0)  # mm
         self._last_command = PlateCommand(roll=0.0, pitch=0.0)
+        # Diagnostics of the last update(); None / {} when no law was computed.
+        self.last_error: tuple[float, float] | None = None
+        self.last_terms: dict[str, float] = {}
+        self.saturated = False
+
+    def coefficients(self) -> dict:
+        """Gains / tuning of this controller, for the log header."""
+        return {"max_tilt_rad": self.max_tilt}
 
     def set_target(self, x: float, y: float) -> None:
         self.target = (x, y)
@@ -34,6 +47,9 @@ class Controller(ABC):
         """Clear any internal state (integrators...). Stateless by default."""
 
     def update(self, state: BallEstimate, dt: float) -> PlateCommand:
+        self.last_error = None
+        self.last_terms = {}
+        self.saturated = False
         if dt <= 0.0:
             # Same contract as Estimation/Actuation: never raise on a bad
             # tick, just hold the last command.
@@ -49,6 +65,7 @@ class Controller(ABC):
 
         ex = state.x - self.target[0]
         ey = state.y - self.target[1]
+        self.last_error = (ex, ey)
         roll, pitch = self._compute(ex, ey, state.vx, state.vy, dt)
 
         # Hard clamp on the tilt MAGNITUDE: clamping each axis separately
@@ -56,6 +73,7 @@ class Controller(ABC):
         # the IK runs out of reach first.
         tilt = math.hypot(roll, pitch)
         if tilt > self.max_tilt:
+            self.saturated = True
             scale = self.max_tilt / tilt
             roll *= scale
             pitch *= scale

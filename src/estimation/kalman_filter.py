@@ -44,6 +44,10 @@ class KalmanFilter:
         # Initial estimate covariance
         self.P = np.diag([4.0, 4.0, 90000.0, 90000.0])
 
+        # Innovation (z - Hx, before correction) of the last update(), for
+        # logging: should be zero-mean white noise if the filter is tuned.
+        self.last_innovation = np.zeros(2)
+
     @staticmethod
     def _state_to_vector(state: State) -> np.ndarray:
         """Convert State to a 4x1 column vector for matrix calculations."""
@@ -100,6 +104,7 @@ class KalmanFilter:
         state_vector = self._state_to_vector(self._current_state)
 
         residual = z - self.H @ state_vector
+        self.last_innovation = residual.flatten()
         S = self.H @ self.P @ self.H.T + self.R
         K = self.P @ self.H.T @ np.linalg.inv(S)
 

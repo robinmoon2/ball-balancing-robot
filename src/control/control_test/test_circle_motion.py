@@ -37,9 +37,11 @@ import sys
 import time
 
 import numpy as np
+from pathlib import Path
 
-from actuator.Servo import create_pca
-from control.inverse_kinematics import (
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # repo root
+from src.actuator.Servo import create_pca
+from src.control.inverse_kinematics import (
     PlateOrientation,
     solve_bearing_positions,
     solve_end_effector_positions,
@@ -50,14 +52,14 @@ from control.inverse_kinematics import (
 from src.control.control_test.test_vertical_motion import L, angles_out_of_range, build_arms
 
 ### CONFIG ###
-H_CIRCLE = 170.0  # mm, plate centre height held constant through the circle.
+H_CIRCLE = 200.0  # mm, plate centre height held constant through the circle.
 # NB: this is not a free choice. The raw IK angle for a flat plate rises with
 # height (h=150 -> q=16 deg, h=170 -> q=26 deg), and the cone swings each arm
 # ~ +/-21 deg about that value at TILT_DEG=20. At h=150 the bottom of that
 # swing crosses the servos' raw 0 deg hard stop; h=170 leaves ~8 deg of margin
 # there while staying well clear of the reach limit (poses go unreachable
 # above h~185 at large tilt).
-TILT_DEG = 17.0  # cone half-angle: how far the normal leans from vertical
+TILT_DEG = 25.0  # cone half-angle: how far the normal leans from vertical
 REVOLUTION_S = 1.0  # s for the tilt direction to make one full turn
 RAMP_REVOLUTIONS = 2.0  # turns spent ramping tilt 0 -> TILT_DEG (the "spiral")
 STEP_DT = 0.0005  # s between commands

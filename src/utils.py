@@ -30,11 +30,16 @@ class PID:
     _integral: float = field(default=0.0, init=False)
     _prev_error: float | None = field(default=None, init=False)
     _prev_derivative: float = field(default=0.0, init=False)
+    # Individual P / I / D contributions of the last update(), for logging.
+    last_p: float = field(default=0.0, init=False)
+    last_i: float = field(default=0.0, init=False)
+    last_d: float = field(default=0.0, init=False)
 
     def reset(self) -> None:
         self._integral = 0.0
         self._prev_error = None
         self._prev_derivative = 0.0
+        self.last_p = self.last_i = self.last_d = 0.0
 
     def update(self, error: float, speed: float, dt: float) -> float:
         if dt <= 0:
@@ -55,7 +60,10 @@ class PID:
         derivative = a * self._prev_derivative + (1 - a) * raw_deriv
 
         # Output
-        output = self.kp * error + self.ki * self._integral + self.kd * speed#derivative
+        self.last_p = self.kp * error
+        self.last_i = self.ki * self._integral
+        self.last_d = self.kd * speed  # derivative
+        output = self.last_p + self.last_i + self.last_d
 
         # Output saturation
         lo, hi = self.output_limits

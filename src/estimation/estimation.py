@@ -53,15 +53,34 @@ class Estimation:
         self._ticks: int = 0  # measurements accepted since reset
         self._misses: int = 0  # consecutive frames without a measurement
         self._last = BallEstimate(0.0, 0.0, 0.0, 0.0, 0.0, valid=False)
+        # Innovation of the measurement fused THIS tick, None if no fusion.
+        self._last_innovation: tuple[float, float] | None = None
 
     @property
     def consecutive_misses(self) -> int:
         return self._misses
 
+    @property
+    def last_innovation(self) -> tuple[float, float] | None:
+        """Kalman innovation (measurement - prediction, mm) of the last
+        update() call, or None if that call fused no measurement."""
+        return self._last_innovation
+
+    def config(self) -> dict:
+        """Tuning parameters, for the log header."""
+        return {
+            "process_noise_std": self.process_noise_std,
+            "measurement_noise_std": self.measurement_noise_std,
+            "warmup_ticks": self.warmup_ticks,
+            "max_dropout_seconds": self.max_dropout_seconds,
+            "initial_velocity_std": self.initial_velocity_std,
+        }
+
     def update(
         self, measurement: tuple[float, float] | None, t: float) -> BallEstimate:
         """Advance the estimate to time `t` and return it."""
         meas = self._sanitize(measurement)
+        self._last_innovation = None
 
         # First call ever (or first after a reset): nothing to propagate.
         if self._kf is None:
@@ -89,6 +108,7 @@ class Estimation:
             self._misses += 1
         else:
             self._kf.update(meas[0], meas[1])
+            self._last_innovation = tuple(float(v) for v in self._kf.last_innovation)
             self._t_last_measurement = t
             self._ticks += 1
             self._misses = 0
