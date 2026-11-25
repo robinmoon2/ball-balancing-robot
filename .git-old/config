@@ -1,0 +1,19 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "origin"]
+	url = https://github.com/robinmoon2/ball-balancing-robot.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "main"]
+	remote = origin
+	merge = refs/heads/main
+[branch "dev"]
+	remote = origin
+	vscode-merge-base = origin/dev
+	merge = refs/heads/dev
+[branch "cleaning_repo"]
+	remote = origin
+	merge = refs/heads/cleaning_repo
+	vscode-merge-base = origin/cleaning_repo

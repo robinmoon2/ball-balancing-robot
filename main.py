@@ -41,14 +41,14 @@ def build_arms(pca) -> np.ndarray:
     return np.array([arm_1, arm_2, arm_3])
 
 
-PID_X = PID(kp=0.0057, ki=0.0051, kd=0.0011, integral_limits=(-100,100))#kp=0.0026,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))
-PID_Y = PID(kp=0.0057, ki=0.0051, kd=0.0011, integral_limits=(-100,100))#kp=0.0026,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))
+PID_X = PID(kp=0.0026,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))#
+PID_Y = PID(kp=0.0026,ki=0.0002,kd=0.0009, integral_limits=(-100, 100))#
 
 pca = create_pca()
 arms: np.ndarray = build_arms(pca)
 
 calibration = Calibration(origin_px=(int(os.getenv("CAMERA_WIDTH")) // 2, int(os.getenv("CAMERA_HEIGHT")) // 2),
-                          mm_per_px=0.14)
+                          mm_per_px=0.192)  # ruler snapshot at 768x432, 2026-11-25
 perception = Perception(calibration=calibration,
                         camera=Camera(source=int(os.getenv("CAMERA_SOURCE")),width=int(os.getenv("CAMERA_WIDTH")),height=int(os.getenv("CAMERA_HEIGHT")),
                                       framerate=int(os.getenv("CAMERA_FRAMERATE"))),
@@ -74,7 +74,7 @@ else:
 
 
 controller.set_target(0.0, 0.0)
-actuator = Actuation(arms=arms, plate_radius=float(os.getenv("L")), neutral_height=float(os.getenv("H")), max_rate_rad_s=5.0)
+actuator = Actuation(arms=arms, plate_radius=float(os.getenv("L")), neutral_height=float(os.getenv("H")), max_rate_rad_s=10.0)
 
 print("INITIALISATION COMPLETE: starting main loop. Press Ctrl+C to stop and write log.")
 
